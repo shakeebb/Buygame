@@ -2,12 +2,13 @@
 Shows the main menu for the game, gets the user name before starting
 """
 import pygame
-import time
 from base import Game
 from player import Player
 
+
 class MainMenu:
-    BG = (255,255,255)
+    BG = (255, 255, 255)
+
     def __init__(self):
         self.WIDTH = 1300
         self.HEIGHT = 1000
@@ -20,10 +21,10 @@ class MainMenu:
 
     def draw(self):
         self.win.fill(self.BG)
-        title = self.title_font.render("Welcome to buygame!", 1, (0,0,0))
-        self.win.blit(title, (self.WIDTH/2 - title.get_width()/2, 50))
+        title = self.title_font.render("Welcome to buygame!", 1, (0, 0, 0))
+        self.win.blit(title, (self.WIDTH / 2 - title.get_width() / 2, 50))
 
-        name = self.name_font.render("Type a Name: " + self.name, 1, (0,0,0))
+        name = self.name_font.render("Type a Name: " + self.name, 1, (0, 0, 0))
         self.win.blit(name, (100, 400))
 
         if self.waiting:
@@ -46,11 +47,11 @@ class MainMenu:
                 # response = self.n.send({-1:[]})
                 # if response:
                 #     run = False
-                    g = Game()
-                    # for player in response:
-                    p = Player(player)
-                    g.players.append(p)
-                    g.main()
+                g = Game()
+                # for player in response:
+                p = Player(player)
+                g.players.append(p)
+                g.main()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
@@ -67,6 +68,7 @@ class MainMenu:
                         # converts to uppercase the key name
                         key_name = key_name.lower()
                         self.type(key_name)
+
     def type(self, char):
         if char == "backspace":
             if len(self.name) > 0:
@@ -78,6 +80,7 @@ class MainMenu:
 
         if len(self.name) >= 20:
             self.name = self.name[:20]
+
 
 if __name__ == "__main__":
     pygame.font.init()

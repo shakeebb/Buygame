@@ -5,28 +5,34 @@ Created on Fri Mar 26 12:19:27 2021
 @author: Boss
 """
 
-
-import socket
 import pickle
+import socket
 import time
+
 HEADER_LENGTH = 2048
+
+
 def createMessage(message):
     HEADER_LENGTH = 2048
     try:
         if message is not False:
             message = message.encode('utf-8')
-        
+
         return message
         # creates message ready for socket 
         # needs message, HEADER_LENGTH
         # returns message ready for socket 
     except Exception as e:
         print(e)
+
+
 def createPickle(aPickle):
     HEADER_LENGTH = 4096
     aPickled = pickle.dumps(aPickle)
     aPickled = bytes(aPickled)
     return aPickled
+
+
 def receive_pickle(client_socket):
     try:
         HEADER_LENGTH = 4096
@@ -42,6 +48,8 @@ def receive_pickle(client_socket):
         return unpickled
     except:
         return False
+
+
 def receive_message(client_socket):
     HEADER_LENGTH = 2048
     try:
@@ -56,6 +64,8 @@ def receive_message(client_socket):
 
     except:
         return False
+
+
 class Network:
     def __init__(self):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -64,7 +74,7 @@ class Network:
         self.addr = (self.server, self.port)
         self.p = int(self.connect())
         print("done initialize")
-        
+
     def getP(self):
         return self.p
 
@@ -96,7 +106,7 @@ class Network:
                     return data
             except socket.error as e:
                 print(e)
-    
+
     def sendP(self, data):
         while True:
             try:
@@ -110,4 +120,3 @@ class Network:
                     return data
             except socket.error as e:
                 print(e)
-            
