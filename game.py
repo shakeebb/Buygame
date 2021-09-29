@@ -1,30 +1,30 @@
 import pygame
-from button import Button, TextButton
 from board import Board
-from top_bar import TopBar
-#from main_menu import MainMenu
+from bottom_bar import BottomBar
+from button import TextButton
+from chat import Chat
+# from main_menu import MainMenu
 from leaderboard import Leaderboard
 from player import Player
-from bottom_bar import BottomBar
-from chat import Chat
+from top_bar import TopBar
 
 
 class Game:
-    BG = (255,255,255)
+    BG = (255, 255, 255)
 
     def __init__(self):
         self.WIDTH = 1300
         self.HEIGHT = 1000
         self.win = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
-        self.leaderboard = Leaderboard(50,125)
-        self.board = Board(305,125)
-        self.top_bar = TopBar(10,10,1280,100)
+        self.leaderboard = Leaderboard(50, 125)
+        self.board = Board(305, 125)
+        self.top_bar = TopBar(10, 10, 1280, 100)
         self.top_bar.change_round(1)
         self.players = [Player("Tim"), Player("Joe"), Player("Bill"), Player("Jeff"), Player("TBob")]
-        self.skip_button = TextButton(85, 830, 125, 60, (255,255,0), "Skip")
-        self.bottom_bar = BottomBar(305,880,self)
+        self.skip_button = TextButton(85, 830, 125, 60, (255, 255, 0), "Skip")
+        self.bottom_bar = BottomBar(305, 880, self)
         self.chat = Chat(1050, 125)
-        self.draw_color = (0,0,0)
+        self.draw_color = (0, 0, 0)
         for player in self.players:
             self.leaderboard.add_player(player)
 
@@ -78,7 +78,6 @@ class Game:
                     self.chat.type(key_name)
 
         pygame.quit()
-
 
 # if __name__ == "__main__":
 #     pygame.font.init()

@@ -1,20 +1,14 @@
-
 # -*- coding: utf-8 -*-
 """
 Created on Fri Mar 26 14:08:18 2021
 
 @author: Boss
 """
-import socket
-import select
-import errno
 import sys
+import time
 
 import game
-import pickle
-import time
 from network import Network
-
 
 nofw = 4
 status = ""
@@ -32,7 +26,7 @@ def receivedRacks(myPlayer, n, myNumber):
     print("Your rack contains: ")
     for tile in myPlayer.get_rack_arr():
         print(tile.letter, tile.score)
-        
+
     print("New letters: ")
     for tile in myPlayer.rack.get_temp_arr():
         print(tile.letter, tile.score)
@@ -101,13 +95,13 @@ def receivedRacks(myPlayer, n, myNumber):
                 attempt -= 1
                 print(
                     f"You failed to sell the word,{attempt} attempts left"
-                    )
+                )
         print("You now have: $", myPlayer.money)
         # %% done selling
-            # sending player object to game
+        # sending player object to game
     myGame = n.send(Iplayed)
     return myGame
-        # %%
+    # %%
 
 
 def main():
@@ -127,7 +121,7 @@ def main():
     except Exception as e:
         print(e)
         print("couldnt connect")
-        sys.exit("Cant connect to host")  
+        sys.exit("Cant connect to host")
 
     run = True
     # firstRun = True
@@ -156,7 +150,6 @@ def main():
         user_ans = ""
 
         if myGame is not False:
-
             myPlayer = myGame.getPlayer(myNumber)
             # print("number success")
         # %%  lobby
@@ -183,7 +176,7 @@ def main():
                         print(e)
 
             if myGame.ready:
-            # %% all connected players are ready 
+                # %% all connected players are ready
                 print("game state is ready ")
                 print(f"{len(myGame.getPlayers())} players are connnected")
                 beginOrNo = input("Do you want to begin (Y/N) ").upper()
@@ -204,7 +197,7 @@ def main():
             # leader rolled
             serverMessage = myGame.getServerMessage()
 
-        # %% racks are handed
+            # %% racks are handed
             if "Racks" in serverMessage:
                 try:
                     myPlayer = myGame.getPlayer(myNumber)
@@ -213,7 +206,7 @@ def main():
                 except Exception as e:
                     print(e)
             # players could be done
-        # %%
+            # %%
             if "Done" in myGame.getServerMessage():
                 print(f"round {i} done, time for next round ")
                 i += 1
@@ -240,6 +233,7 @@ def main():
                 print(f"Player {myGame.currentPlayer} needs to roll")
 
         # %% done rolling
+
 
 # %%
 
