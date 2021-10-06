@@ -1,7 +1,10 @@
-import thorpy
+import time
 
 import pygame
+import thorpy
+
 from button import TextButton
+from dice import Dice
 
 
 class BottomBar:
@@ -16,6 +19,7 @@ class BottomBar:
         7: (165, 42, 42),
         8: (128, 0, 128)
     }
+    dice: Dice = None
 
     def __init__(self, x, y, game):
         self.x = x
@@ -53,6 +57,8 @@ class BottomBar:
         self.removebutton.draw(win)
         self.createbutton.draw(win)
         self.chatbutton.draw(win)
+        if self.dice is not None:
+            self.dice.draw()
 
     def button_events(self):
         """
@@ -60,12 +66,17 @@ class BottomBar:
         :return: None
         """
         mouse = pygame.mouse.get_pos()
+        if self.dice is not None:
+            self.dice = None
 
         if self.help_button.click(*mouse):
-            self.game.chat.update_chat("Help Message")
-            choices = [("Choose Dice ", self.choose_dice()), ("cancel", None)]
-            thorpy.launch_blocking_choices("Help!\n",
-                                           choices)
+            # choices = [("Choose Dice ", self.choose_dice()), ("cancel", None)]
+            # thorpy.launch_blocking_choices("Help!\n",
+            #                                choices)
+            self.dice = Dice(self.game.win, 200, 200, 100, 0.2)
+            self.dice.draw()
+            roll = self.dice.roll(10)
+            self.game.chat.update_chat("Help Message " + str(roll))
         if self.backtome.click(*mouse):
             self.game.myrack.returntome(self.game.tileList)
         if self.removebutton.click(*mouse):

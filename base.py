@@ -210,5 +210,6 @@ class Bag(pygame.sprite.Sprite):
         self.count = 100
 
 
-g = Game()
-g.main()
+if __name__ == "__main__":
+    g = Game()
+    g.main()
