@@ -7,9 +7,7 @@ import time
 
 import pygame
 
-"""
-  Dice class that rolls and returns random number between 1 - 6.
-"""
+
 class Dice:
     spot_color = (0, 0, 0)
     d: pygame.Rect = None
@@ -17,6 +15,14 @@ class Dice:
     rand = random
 
     def __init__(self, win: pygame.Surface, x, y, size, refresh_interval):
+        """
+        Dice class that rolls and returns random number between 1 - 6.
+
+        x: starting 'x' position on the surface
+        y: starting 'y' position on the surface
+        size: dice size (side of a square)
+        refresh_interval: sleep wait time between dice rolls.
+        """
         self.win = win
         self.x = x
         self.y = y
