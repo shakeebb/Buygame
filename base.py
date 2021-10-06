@@ -10,6 +10,7 @@ from leaderboard import Leaderboard
 from player import Player
 from snap import Inventory
 from top_bar import TopBar
+from gameconstants import *
 
 
 class Game:
@@ -129,6 +130,11 @@ class Game:
                 if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
                     pygame.quit()
                     sys.exit()
+
+                if event.type == EV_DICE_ROLL:
+                    print("Received Roll dice event")
+                    self.bottom_bar.roll_dice()
+
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
                     x, y = pos
