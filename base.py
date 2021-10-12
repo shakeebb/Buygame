@@ -6,6 +6,7 @@ import pygame
 import sys
 from bottom_bar import BottomBar
 from chat import Chat
+from display import Display
 from leaderboard import Leaderboard
 from player import Player
 from snap import Inventory
@@ -14,60 +15,60 @@ from gameconstants import *
 
 
 class Game:
-    FPS = 30  # frames per second, the general speed of the program
-    # WINDOWWIDTH = 800 # size of window's width in pixels
-    # WINDOWHEIGHT = 600 # size of windows' height in pixels
-    #             R    G    B
-    global COLORS
-    COLORS = {
-        "GRAY": (100, 100, 100),
-        "NAVYBLUE": (60, 60, 100),
-        "WHITE": (255, 255, 255),
-        "RED": (255, 0, 0),
-        "GREEN": (0, 255, 0),
-        "BLUE": (0, 0, 255),
-        "YELLOW": (255, 255, 0),
-        "ORANGE": (255, 128, 0),
-        "PURPLE": (255, 0, 255),
-        "CYAN": (0, 255, 255)
-    }
-
-    BGCOLOR = COLORS["BLUE"]
-
     def __init__(self):
-        global COLORS
-        pygame.font.init()
+        Display.init()
         self.tileID = 0
-        self.WIDTH = 1200
-        self.HEIGHT = 800
-        self.win = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
-        self.leaderboard = Leaderboard(self.WIDTH * 10 / 800, self.HEIGHT * 75 / 600)
-        self.inventory = Inventory(self.WIDTH * 0.08, self.HEIGHT * 300 / 600, 75, 1, 10, COLORS["GRAY"])
+        self.surface = Display.surface()
+
+        self.top_bar = TopBar(0.5, 0.5, Display.num_horiz_cells() - 1, 4)
+        self.leaderboard = Leaderboard(0.5, self.top_bar.ymargin() + 1, 5, 10)
+        self.chat = Chat(Display.num_horiz_cells() - 10, self.top_bar.ymargin() + 0.5,
+                         10, Display.num_vert_cells() - 6,
+                         self)
         # self.board = Board(305,125)
-        self.players = [Player("SHAK"), Player("ALICE"), Player("NANCY"), Player("CLIFTON")]
-        self.leaderboard.players = self.players
-        self.top_bar = TopBar(10, 10, self.WIDTH * 0.95, self.HEIGHT * 0.1)
-        self.top_bar.change_round(1)
-        self.bottom_bar = BottomBar(self.WIDTH * 10 / 800, self.HEIGHT * 475 / 600, self)
-        self.chat = Chat(self.WIDTH * 670 / 800, self.HEIGHT * 100 / 600, self)
+        self.inventory = Inventory(self.leaderboard.xmargin() + 5,
+                                   self.top_bar.ymargin() + 4,
+                                   self.chat.h_margin_cells - 2,
+                                   2, 2.5, 1, 10, Colors.GRAY.value)
+        # self.inventory = Inventory((self.chat.h_margin_cells - self.leaderboard.xmargin()) / 2,
+        #                            self.top_bar.ymargin() + 4,
+        #                            24, 2.5, 75, 1, 10, Colors.GRAY.value)
+        # self.inventory = Inventory(self.leaderboard.xmargin(), display_height * 300 / 600,
+        # 75, 1, 10, Colors.GRAY.value)
+        # self.inventory = Inventory(display_width * 0.08, display_height * 300 / 600, 75, 1, 10, Colors.GRAY.value)
+        self.bag = Bag(self.leaderboard.xmargin()/3, self.leaderboard.ymargin() + 1, 2)
+        # self.chat = Chat(display_width * 670 / 800, display_height * 100 / 600, self)
+
         # self.backgroundTiles = pygame.sprite.Group()
         # self.helpbox = thorpy.Box(elements=[thorpy.Element("Hello")])
-        self.myrack = Inventory(self.WIDTH * 245 / 800, self.HEIGHT * 485 / 600, 75, 2, 4, COLORS["ORANGE"])
-        self.extrarack = Inventory(self.WIDTH * 125 / 800, self.HEIGHT * 485 / 600, 75, 2, 2, COLORS["RED"])
+        self.bottom_bar = BottomBar(0.5, self.bag.ymargin() + 1,
+                                    self.chat.h_margin_cells - 1,
+                                    self.chat.ymargin() - self.bag.ymargin() - 1,
+                                    self)
 
+        self.myrack = Inventory(self.bottom_bar.h_margin_cells + 5,
+                                self.bottom_bar.v_margin_cells + 1,
+                                self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 10, Colors.ORANGE.value)
+
+        self.extrarack = Inventory(self.bottom_bar.h_margin_cells + 10,
+                                   self.bottom_bar.v_margin_cells + 5,
+                                   self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 5, Colors.RED.value)
+
+        self.players = [Player("SHAK"), Player("ALICE"), Player("NANCY"), Player("CLIFTON"), Player("SOUBHIK CHAKRABORTY")]
+        self.leaderboard.players = self.players
+        self.top_bar.change_round(1)
         self.tileList = pygame.sprite.Group()
-        self.bag = pygame.sprite.Group()
+
+        w, h = Display.dims()
+        # self.bag = pygame.sprite.Group()
 
     def draw(self):
-        self.win.fill(self.BGCOLOR)
-        self.leaderboard.draw(self.win)
-        self.top_bar.draw(self.win)
-        self.bottom_bar.draw(self.win)
+        self.surface.fill(BG_COLOR)
+        self.leaderboard.draw(self.surface)
+        self.top_bar.draw(self.surface)
         # self.middle_bar.draw(self.win)
-        self.inventory.draw(self.win)
-        self.myrack.draw(self.win)
-        self.extrarack.draw(self.win)
-        self.chat.draw(self.win)
+        self.inventory.draw(self.surface)
+        self.chat.draw(self.surface)
         for tile in self.tileList:
             tile.inBox(self.inventory)
             if tile.inabox:
@@ -78,10 +79,27 @@ class Game:
                 tile.image = pygame.transform.scale(tile.original, (75, 75))
                 tile.size = tile.image.get_size()
                 # print("not in box")
-        self.tileList.draw(self.win)
-        self.bag.draw(self.win)
-        self.inventory.tilegroup.draw(self.win)
-        pygame.display.update()
+        # self.bag.draw(self.surface)
+        self.bag.drawMe()
+        self.inventory.tilegroup.draw(self.surface)
+        self.bottom_bar.draw(self.surface)
+        self.myrack.draw(self.surface)
+        self.extrarack.draw(self.surface)
+        self.tileList.draw(self.surface)
+
+        Display.display_grid()
+        Display.show()
+
+    def refresh_resolution(self, w, h):
+        self.top_bar.refresh_dims()
+        self.leaderboard.refresh_dims()
+        self.inventory.refresh_dims()
+        self.chat.refresh_dims()
+        self.bag.refresh_dims()
+        self.bottom_bar.refresh_dims()
+        self.myrack.refresh_dims()
+        self.extrarack.refresh_dims()
+        pass
 
     def check_clicks(self):
         """
@@ -99,10 +117,8 @@ class Game:
                 break
 
     def main(self):
-        global FPSCLOCK, DISPLAYSURF
-        pygame.init()
         pygame.display.set_caption('beta version BuyGame')
-
+        w, h = Display.dims()
         # self.box = thorpy.Box(elements=[slider,button1])
         #
         # #we regroup all elements on a menu, even if we do not launch the menu
@@ -112,7 +128,7 @@ class Game:
         #     element.surface = self.win
         # self.box.set_topleft((100,100))
 
-        self.bag.add(Bag(self.WIDTH * 0.05, self.HEIGHT * 0.72))
+        # self.bag.add(Bag(w * 0.05, h * 0.72))
         FPSCLOCK = pygame.time.Clock()
         # screen = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         mousex = 0  # used to store x coordinate of mouse event
@@ -131,8 +147,11 @@ class Game:
                     pygame.quit()
                     sys.exit()
 
+                if event.type == VIDEORESIZE:
+                    Display.resize(event, self.refresh_resolution)
+
                 if event.type == EV_DICE_ROLL:
-                    print("Received Roll dice event")
+                    print("Received Roll dice event") if VERBOSE else None
                     self.bottom_bar.roll_dice()
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
@@ -206,14 +225,30 @@ class Tile(pygame.sprite.Sprite):
         return self.inabox
 
 
-class Bag(pygame.sprite.Sprite):
-    def __init__(self, xpos, ypos):
-        super(Bag, self).__init__()
-        self.image = pygame.image.load(os.path.join("Tiles", "bag.jpg"))
+class Bag(Display):
+    def __init__(self, h_margin_cells, v_margin_cells, num_cells):
+        super().__init__(h_margin_cells, v_margin_cells, num_cells, num_cells)
+        self.image = pygame.image.load(os.path.join("Tiles", "bag-4.png")).convert()
+        im_sz = num_cells * Display.TILE_SIZE
+        self.image = pygame.transform.scale(self.image, (im_sz, im_sz))
+        # self.image = pygame.transform.scale(
+        #     pygame.image.load(os.path.join("Tiles", "bag-icon.png")).convert(),
+        #     (100, 50))
+        self.image.set_colorkey(self.image.get_at((0, 0)))
         self.rect = self.image.get_rect()
-        self.rect.y = ypos - self.rect.height / 2
-        self.rect.x = xpos - self.rect.height / 2
         self.count = 100
+        self.refresh_dims()
+
+    def drawMe(self):
+        Display.surface().blit(self.image, self.rect)
+
+    def refresh_dims(self):
+        super().refresh_dims()
+        self.rect = self.image.get_rect()
+        self.rect.x = self.x
+        self.rect.y = self.y
+        if VERBOSE:
+            print("Box %s " % self.box_size)
 
 
 if __name__ == "__main__":

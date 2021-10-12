@@ -1,17 +1,22 @@
 import pygame
 
+from display import Display
+from gameconstants import VERBOSE
 
-class Inventory:
-    def __init__(self, x, y, size, rows, cols, color):
+
+class Inventory(Display):
+    def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells, size, rows, cols, color):
+        super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
+        if VERBOSE:
+            print("Inv: %s %s W %s" % (h_margin_cells, v_margin_cells, width_cells))
         self.rows = rows
         self.col = cols
         self.items = [[None for _ in range(self.rows)] for _ in range(self.col)]
-        self.box_size = size
-        self.x = x
-        self.y = y
+        self.box_size = Display.TILE_SIZE * size
         self.border = 3
         self.color = color
         self.tilegroup = pygame.sprite.Group()
+        self.refresh_dims()
 
     # draw everything
     def draw(self, win):
@@ -122,3 +127,9 @@ class Inventory:
             if self.items[x][y]:
                 word += self.items[x][y].letter
         print(word)
+
+    def refresh_dims(self):
+        super().refresh_dims()
+        # self.box_size -= (self.col * self.border)
+        if VERBOSE:
+            print("%s " % self.box_size)

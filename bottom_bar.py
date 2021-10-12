@@ -5,54 +5,63 @@ import thorpy
 
 from button import TextButton
 from dice import Dice
+from display import Display
+from gameconstants import *
 
 
-class BottomBar:
-    COLORS = {
-        0: (255, 255, 255),
-        1: (0, 0, 0),
-        2: (255, 0, 0),
-        3: (0, 255, 0),
-        4: (0, 0, 255),
-        5: (255, 255, 0),
-        6: (255, 140, 0),
-        7: (165, 42, 42),
-        8: (128, 0, 128)
-    }
+class BottomBar(Display):
     rand = random  # uniform randomness requires long living objects
 
-    def __init__(self, x, y, game):
-        self.x = x
-        self.y = y
-        self.WIDTH = 660 / 800 * game.WIDTH
-        self.HEIGHT = 125 / 600 * game.HEIGHT
+    def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells, game):
+        super(BottomBar, self).__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
+        w, h = Display.dims()
+        # self.WIDTH = 660 / 800 * w
+        # self.HEIGHT = 125 / 600 * h
         self.BORDER_THICKNESS = 5
         self.game = game
-        self.help_button = TextButton(self.x + 550 / 800 * game.WIDTH,
-                                      self.y + 25 / 600 * game.HEIGHT, 80, 50, (128, 128, 128), "Help")
-        self.backtome = TextButton(self.x + 10 / 800 * game.WIDTH,
-                                   self.y + 25 / 600 * game.HEIGHT, 80, 50, (128, 128, 128), "Return")
-        self.removebutton = TextButton(self.x + 600 / 800 * game.WIDTH,
-                                       self.y + 25 / 600 * game.HEIGHT, 80, 50, (128, 128, 128), "Remove")
-        self.createbutton = TextButton(self.x + 600 / 800 * game.WIDTH,
-                                       self.y + 75 / 600 * game.HEIGHT, 80, 50, (128, 128, 128), "Create")
-        self.chatbutton = TextButton(self.x + 550 / 800 * game.WIDTH,
-                                     self.y + 75 / 600 * game.HEIGHT, 80, 50, (128, 128, 128), "Chat")
+        button_features = (3.5, 1.5, Colors.DARK_GRAY.value)
+        self.backtome = TextButton(h_margin_cells + 1,
+                                   v_margin_cells + 1, *button_features, " Return ",
+                                   Colors.ORANGE.value)
+        controls = [[(" Help ", -9, 1), (" Remove ", -5, 1)],
+                    [("Create", -9, 3), (" Chat ", -5, 3)]
+                    ]
+
+        self.help_button = TextButton(self.xmargin() + controls[0][0][1],
+                                      self.v_margin_cells + controls[0][0][2],
+                                      *button_features, controls[0][0][0])
+
+        self.removebutton = TextButton(self.xmargin() + controls[0][1][1],
+                                       self.v_margin_cells + controls[0][1][2],
+                                       *button_features, controls[0][1][0])
+
+        self.createbutton = TextButton(self.xmargin() + controls[1][0][1],
+                                       self.v_margin_cells + controls[1][0][2],
+                                       *button_features, controls[1][0][0])
+
+        self.chatbutton = TextButton(self.xmargin() + controls[1][1][1],
+                                     self.v_margin_cells + controls[1][1][2],
+                                     *button_features, controls[1][1][0])
+
         self.dice: Dice = None
+
+    def refresh_dims(self):
+        super().refresh_dims()
+        self.backtome.refresh_dims()
 
     def friendly_chat(self):
         pass
 
     def choose_dice(self):
         dvals = thorpy.DropDownListLauncher("Choose Dice", titles=[i for i in range(2, 5)])
-        dvals.surface = self.game.win
+        dvals.surface = self.game.surface
         dvals.blit()
 
     def all_chat(self):
         pass
 
     def draw(self, win):
-        pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.WIDTH, self.HEIGHT), self.BORDER_THICKNESS)
+        pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
         self.help_button.draw(win)
         self.backtome.draw(win)
         self.removebutton.draw(win)

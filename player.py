@@ -1,11 +1,11 @@
 """
 Represents the player(s) in each game
 """
-
+from gameconstants import *
 
 class Player(object):
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, name: str):
+        self.name = name[0:MAX_NAME_LENGTH]
         self.score = 200
 
     def update_score(self, x):

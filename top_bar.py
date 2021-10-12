@@ -3,13 +3,13 @@ Top bar displaying information about round
 """
 import pygame
 
+from display import Display
+from gameconstants import *
 
-class TopBar(object):
-    def __init__(self, x, y, width, height):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
+
+class TopBar(Display):
+    def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells):
+        super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
         self.word = "Temp Rack"
         self.round = 1
         self.max_round = 15
@@ -17,6 +17,7 @@ class TopBar(object):
         self.BORDER_THICKNESS = 5
         self.time = 60
         self.drawing = False
+        self.refresh_dims()
 
     def draw(self, win):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
@@ -57,3 +58,8 @@ class TopBar(object):
 
     def change_round(self, rnd):
         self.round = rnd
+
+    def refresh_dims(self):
+        super().refresh_dims()
+        if VERBOSE:
+            print("TopBar ht = %s, y = %s" % (self.height, self.y))
