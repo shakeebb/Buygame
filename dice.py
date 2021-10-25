@@ -41,7 +41,7 @@ class Dice:
         self.d: pygame.Rect = None
 
     def draw(self):
-        self.d = pygame.draw.rect(self.game.win, (255, 255, 255),
+        self.d = pygame.draw.rect(self.game.surface, (255, 255, 255),
                                   (self.x, self.y, self.size, self.size))
         if self.rolled_no > 0:
             self.__spotify_dice(self.rolled_no)
@@ -51,7 +51,7 @@ class Dice:
         self.roll_number_of_iters = 0
 
     def __draw_spot(self, d1, d2):
-        pygame.draw.circle(self.game.win, self.spot_color, (self.x + d1, self.y + d2), self.dots_sz)
+        pygame.draw.circle(self.game.surface, self.spot_color, (self.x + d1, self.y + d2), self.dots_sz)
 
     def __spotify_dice(self, r):
         if r % 2 == 1:  # for 1, 3, 5 draw the center spot
@@ -67,7 +67,7 @@ class Dice:
             self.__draw_spot(self.right, self.mid)
 
     def continue_rolling(self):
-        print("Rolling for " + str(self.roll_number_of_iters))
+        print("Rolling for " + str(self.roll_number_of_iters)) if VERBOSE else None
         self.rolled_no = self.rand.randint(1, 6)
         self.draw()
         self.__spotify_dice(self.rolled_no)
