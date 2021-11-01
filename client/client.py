@@ -7,8 +7,7 @@ Created on Fri Mar 26 14:08:18 2021
 import sys
 import time
 
-import game
-from network import Network
+from common import *
 
 nofw = 4
 status = ""
@@ -114,7 +113,7 @@ def main():
     i = 0
     print("lets send network")
     try:
-        n = Network()
+        n = network.Network()
         print("we connected to network")
         print(n.p)
         myNumber = n.p

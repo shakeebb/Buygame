@@ -9,8 +9,7 @@ import random
 import socket
 # import thread module
 from _thread import *
-
-import game
+from common import *
 
 # Creating a TCP socket
 # AF_INET means IPV4
