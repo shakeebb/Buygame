@@ -4,7 +4,7 @@ import pygame
 from pygame.event import Event
 from pygame.font import Font
 from pygame.locals import *
-from gameconstants import *
+from common.gameconstants import *
 
 
 def get_tile_sz(_w, _h, sz):

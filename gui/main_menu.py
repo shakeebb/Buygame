@@ -4,9 +4,10 @@ Shows the main menu for the game, gets the user name before starting
 import pygame
 from pygame.locals import *
 
-from base import Game
-from display import Display
-from player import Player
+from gui.base import GameUI
+from common.gameconstants import MAX_NAME_LENGTH
+from common.logger import log, logger
+from gui.display import Display
 
 
 class MainMenu:
@@ -32,23 +33,26 @@ class MainMenu:
             enter = Display.enter_prompt("Press enter to join a game...")
             self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
         Display.show()
+        if self.waiting:
+            log("done display")
 
     def run(self):
         run = True
         clock = pygame.time.Clock()
-        g: Game = None
+        g: GameUI = None
+        logger.reset()
         while run:
             clock.tick(30)
             self.draw()
-            player = self.name
             if self.waiting:
                 # response = self.n.send({-1:[]})
                 # if response:
                 #     run = False
-                g = Game()
+                log("creating GameUI")
+                g = GameUI(self.name)
                 # for player in response:
-                p = Player(player)
-                g.players.append(p)
+                # p = PlayerGUI(player)
+                # g.players.append(p)
                 g.main()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -56,12 +60,13 @@ class MainMenu:
                     pygame.quit()
                     quit()
                 if event.type == VIDEORESIZE:
-                        # screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                    # screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                     Display.resize(event, g.refresh_resolution) if g is not None else None
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
                         if len(self.name) > 1:
                             self.waiting = True
+                            log("marking end of name entry")
                             # self.n = Network(self.name)
                     else:
                         # gets the key name
@@ -79,8 +84,8 @@ class MainMenu:
         elif len(char) == 1:
             self.name += char
 
-        if len(self.name) >= 20:
-            self.name = self.name[:20]
+        if len(self.name) >= MAX_NAME_LENGTH:
+            self.name = self.name[:MAX_NAME_LENGTH]
 
 
 if __name__ == "__main__":

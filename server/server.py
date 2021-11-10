@@ -5,15 +5,26 @@ Created on Fri Mar 26 13:40:58 2021
 @author: Boss
 """
 import pickle
-import random
 import socket
+import os
 # import thread module
 from _thread import *
-from common import *
+
+import pandas as pd
 
 # Creating a TCP socket
 # AF_INET means IPV4
 # SOCK_STREAM means TCP
+from common.game import *
+from common.gameconstants import *
+from common.logger import log
+
+script_path = os.path.dirname(os.path.abspath(__file__))
+GAMETILES = pd.read_csv(os.path.join(script_path, "tiles.csv"), index_col="LETTER")
+GAMETILES
+# bag = GAMETILES
+WordDict = pd.read_json(os.path.join(script_path, 'words_dictionary.json'), typ='series').index
+
 HEADER_LENGTH = 2048
 IP = "localhost"
 PORT = 1234
@@ -31,7 +42,7 @@ sockets_list = [server_socket]
 clients = {}
 number_of_usr = 0
 waitingForGameToStart = True
-games = {}
+games: Game = {}
 gameId = 0
 
 
@@ -39,24 +50,21 @@ gameId = 0
 
 
 def createMessage(message):
-    HEADER_LENGTH = 2048
-    message = f"{len(message):<{HEADER_LENGTH}}".encode(
+    message = f"{len(message):<{MSG_HEADER_LENGTH}}".encode(
         'utf-8') + message.encode('utf-8')
     return message
 
 
 def createPickle(aPickle):
-    HEADER_LENGTH = 4096
     aPickled = pickle.dumps(aPickle)
-    aPickled = bytes(f"{len(aPickled):<{HEADER_LENGTH}}".encode(
+    aPickled = bytes(f"{len(aPickled):<{SERIALIZE_HEADER_LENGTH}}".encode(
         'utf-8') + aPickled)
     return aPickled
 
 
 def receive_message(client_socket):
     try:
-        HEADER_LENGTH = 2048
-        message_header = client_socket.recv(HEADER_LENGTH)
+        message_header = client_socket.recv(MSG_HEADER_LENGTH)
 
         if not len(message_header):
             return False
@@ -72,8 +80,7 @@ def receive_message(client_socket):
 
 def receive_pickle(client_socket):
     try:
-        HEADER_LENGTH = 4096
-        message_header = client_socket.recv(HEADER_LENGTH)
+        message_header = client_socket.recv(SERIALIZE_HEADER_LENGTH)
         if not len(message_header):
             return False
         # print("first", message_header)
@@ -111,8 +118,13 @@ def threaded(c, p, gameId):
                 if data is not False:
 
                     # %% set player ready
-                    if data == "start":
-                        print("player wants to start game ")
+                    if ClientMsg.HeartBeat.msg == data:
+                        if VERBOSE:
+                            log("sending heartbeat response")
+                        c.sendall(createMessage(ClientMsg.HeartBeat.msg))
+                        continue
+                    elif data == "start":
+                        log("player wants to start game ")
                         # sets player ready
                         currentgame.clients[decodedP].set_start()
                         # %%  check if all connected are ready
@@ -134,18 +146,18 @@ def threaded(c, p, gameId):
                                 "game ready to start ")
                         # %%
 
-                    elif "Name" in data:
+                    elif ClientMsg.Name.msg in data:
                         client_name = data.split(' ')[1]
                         currentgame.clients[decodedP].name = client_name
-                        print(currentgame.clients[decodedP].name)
+                        log(currentgame.clients[decodedP].name)
                         currentgame.setServerMessage("player changed name")
-                    elif "Dice" in data:
+                    elif ClientMsg.Dice.msg in data:
                         diceValue = data.split(' ')[1]
                         diceValue = int(diceValue)
-                        print(f"diceValue is {diceValue}")
+                        log(f"diceValue is {diceValue}")
                         if currentgame.bag.get_remaining_tiles() < (
                                 diceValue * n):
-                            print("no more bags")
+                            log("no more bags")
                             break
                         else:
                             # %% we have enough, are racks initialized?
@@ -154,21 +166,21 @@ def threaded(c, p, gameId):
                                 try:
                                     currentgame.clients[player].rack.clear_rack()
                                 except Exception as e:
-                                    print(e)
+                                    log(e)
                             currentgame.setRolled()
                             currentgame.setRacks(diceValue)
                             currentgame.setServerMessage("Racks Ready")
-                            print("handed racks to all")
+                            log("handed racks to all")
                             games[gameId] = currentgame
                             for player in currentgame.getPlayers():
                                 try:
-                                    print(player.get_rack_str())
-                                    print(player.get_temp_str())
+                                    log(player.get_rack_str())
+                                    log(player.get_temp_str())
                                 except Exception as e:
-                                    print(e)
+                                    log(e)
                     # %% get
                     elif "get" in data:
-                        print("[GET]")
+                        log("[GET]")
                     # %%
                     elif "buying" in data:
                         try:
@@ -198,7 +210,7 @@ def threaded(c, p, gameId):
                         currentgame.getPlayer(decodedP).played = True
                     games[gameId] = currentgame
                     serverMessage = currentgame.getServerMessage()
-                    print(f"serverMessage: {serverMessage} ")
+                    log(f"serverMessage: {serverMessage} ")
                     c.sendall(createPickle((currentgame)))
         except Exception as e:
             print(e)
@@ -219,10 +231,10 @@ while True:
     sockets_list.append(client_socket)
     if number_of_usr == 0:
         print("Creating a new game....")
-        games[gameId] = game.Game(gameId)
+        games[gameId] = Game(gameId, GAMETILES)
     print("creating player object...")
     # Giving player their own socket in dictionary 
-    clients[number_of_usr] = game.Player(int(nofw), int(number_of_usr), games[gameId].getGameBag())
+    clients[number_of_usr] = Player(int(nofw), int(number_of_usr), games[gameId].getGameBag())
     # putting player in game
     print("player created")
     games[gameId].setClients(clients)

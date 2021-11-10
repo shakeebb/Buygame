@@ -8,6 +8,7 @@ import sys
 import time
 
 from common import *
+from common.gameconstants import ClientMsg
 
 nofw = 4
 status = ""
@@ -16,7 +17,6 @@ user_ans = ""
 
 
 def receivedRacks(myPlayer, n, myNumber):
-    name = "Name: "
     Dice = "Dice: "
     Bought = "buying racks "
     Sold = "Sold: "
@@ -104,8 +104,6 @@ def receivedRacks(myPlayer, n, myNumber):
 
 
 def main():
-    name = "Name: "
-    Dice = "Dice: "
     Bought = "buying racks "
     Sold = "Sold: "
     get = "get"
@@ -156,7 +154,7 @@ def main():
         while inLobby:
             myGame = n.send("get")
             if not nameEntered:
-                myName = "Name: " + str(input("enter your name: "))
+                myName = ClientMsg.Name.msg + str(input("enter your name: "))
 
                 try:
                     myGame = n.send(myName)
@@ -220,7 +218,7 @@ def main():
                 print("it is your turn to roll")
                 input("Press enter to roll dice:")
                 diceValue = str(game.dice_roll())
-                diceMessage = Dice + diceValue
+                diceMessage = ClientMsg.Dice.msg + diceValue
                 try:
                     myGame = n.send(diceMessage)
                 except Exception as e:

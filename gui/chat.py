@@ -3,8 +3,8 @@ Represents the chat for the game.
 """
 import pygame
 
-from display import Display
-from gameconstants import *
+from gui.display import Display
+from common.gameconstants import *
 
 
 class Chat(Display):

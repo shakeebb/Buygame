@@ -10,6 +10,10 @@ INIT_TILE_SIZE = 32
 DISPLAY_TILE_GRID = False
 DISPLAY_TILE_GRID_OUTPUT = False
 
+HEARTBEAT_INTERVAL_SECS = 10.0
+MSG_HEADER_LENGTH = 2048
+SERIALIZE_HEADER_LENGTH = 4096
+
 FPS = 30  # frames per second, the general speed of the program
 
 
@@ -51,3 +55,16 @@ LB_DISP_FMT = " #%s %s [%s] "  # no, name [score]
 SURFACE_FLAGS = HWSURFACE | DOUBLEBUF  # | RESIZABLE
 
 EV_DICE_ROLL = pg.USEREVENT + 1
+
+
+class ClientMsg(Enum):
+    Name = "name: "
+    Start = "start"
+    Dice = "dice: "
+    Bought = "buying racks "
+    Sold = "sold: "
+    Get = "get"
+    HeartBeat = "heartbeat"
+
+    def __init__(self, text: str):
+        self.msg = text

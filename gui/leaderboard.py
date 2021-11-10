@@ -3,9 +3,9 @@ Represents the leaderboard object for the client side of the game.
 """
 import pygame
 
-from gameconstants import *
-from display import Display
-from player import Player
+from common.game import Player
+from common.gameconstants import *
+from gui.display import Display
 
 
 class Leaderboard(Display):
@@ -14,7 +14,7 @@ class Leaderboard(Display):
         self.name_font = pygame.font.SysFont("comicsans", 25, bold=True)
         self.score_font = pygame.font.SysFont("comicsans", 20)
         self.rank_font = pygame.font.SysFont("comicsans", 25)
-        self.players = []
+        self.players: Player = []
         self.BORDER_THICKNESS = 5
         self.refresh_dims()
 
@@ -31,7 +31,7 @@ class Leaderboard(Display):
                   " width = %s " % (self.height, self.y, self.y_margin, self.width))
 
     def draw(self, win):
-        scores = [(player.name, player.score) for player in self.players]
+        scores = [(player.number, player.name, player.score) for player in self.players]
         scores.sort(key=lambda x: x[1], reverse=True)
         num_scores = len(scores)
         for i in range(LB_TOP_N):  # show only top 'n' scores
@@ -42,7 +42,7 @@ class Leaderboard(Display):
             sec_h = int(self.height / LB_TOP_N)
             pygame.draw.rect(win, color, (self.x, self.y + i * sec_h, self.width, sec_h))
 
-            if i > num_scores:
+            if i > num_scores or i >= len(scores):
                 continue
 
             score = scores[i]
@@ -50,7 +50,7 @@ class Leaderboard(Display):
             # rank = self.rank_font.render("#" + str(i + 1), 1, (0, 0, 0))
             # win.blit(rank, (self.x + 5, self.y + i * self.HEIGHT + self.HEIGHT / 2 - rank.get_height() / 2))
 
-            name = self.name_font.render(" #%s %s [%s]" % (str(i+1), *score), True, (0, 0, 0))
+            name = self.name_font.render(" #%s %s [%s]" % (score), True, (0, 0, 0))
             win.blit(name, (self.x, self.y + (i * sec_h) + (sec_h*0.35)))
             # win.blit(name, (self.x - name.get_width() / 2 + self.WIDTH / 2, self.y + i * self.HEIGHT + 10))
 

@@ -7,8 +7,6 @@ Created on Fri Mar 26 11:44:56 2021
 import random
 from random import shuffle
 
-import pandas as pd
-
 nofw = 4
 # import player as pl
 # defining game dice
@@ -16,20 +14,15 @@ dice = ['2', '3', '4', '5', 'Your Choice', 'Your Choice']
 # will store values of user
 myTiles = []
 
+
 # df representing bag with tiles and their values and amounts
 
-GAMETILES = pd.read_csv("../server/tiles.csv", index_col="LETTER")
-GAMETILES
-# bag = GAMETILES
-WordDict = pd.read_json('../server/words_dictionary.json', typ='series').index
-
-
 class Game:
-    def __init__(self, id):
+    def __init__(self, id, game_tiles):
         self.id = id
-        self.clients = {}
+        self.clients: Player = {}
         self.ready = False
-        self.bag = Bag()
+        self.bag = Bag(game_tiles)
         self.turn = 0
         self.currentPlayer = 0
         self.leader = 0
@@ -102,7 +95,7 @@ class Game:
         self.resetPlayed()
 
 
-class Player():
+class Player:
     """
     
     Creates an instance of a player.
@@ -121,6 +114,7 @@ class Player():
         self.message = ""
         self.played = False
         self.start = False
+        self.score = 0
 
     def set_name(self, name):
         # Sets the player's name.
@@ -329,13 +323,13 @@ class Bag:
     Takes no arguments to initialize.
     """
 
-    def __init__(self):
+    def __init__(self, game_tiles):
         # Creates the bag full of game tiles,
         # and calls the initialize_bag() method,
         # which adds the default 100 tiles to the bag.
         # Takes no arguments.
         self.bag = []
-        self.initialize_bag()
+        self.initialize_bag(game_tiles)
 
     def add_to_bag(self, tile, quantity):
         # Adds a certain quantity of a certain tile to the bag.
@@ -343,12 +337,11 @@ class Bag:
         for i in range(quantity):
             self.bag.append(tile)
 
-    def initialize_bag(self):
+    def initialize_bag(self, game_tiles):
         # Adds the intiial 108 tiles to the bag.
-        global GAMETILES
-        for index, row in GAMETILES.iterrows():
+        for index, row in game_tiles.iterrows():
             # print(index, row['NO'], row['VALUE'])
-            self.add_to_bag(Tile(index, GAMETILES.loc[:, "VALUE"]), row['NO'])
+            self.add_to_bag(Tile(index, game_tiles.loc[:, "VALUE"], game_tiles), row['NO'])
 
         shuffle(self.bag)
 
@@ -374,12 +367,12 @@ class Tile:
     and an integer representing that letter's score.
     """
 
-    def __init__(self, letter, letter_values):
+    def __init__(self, letter, letter_values, game_tiles):
         # Initializes the tile class. Takes the letter as a string,
         # and the dictionary of letter values as arguments.
         self.letter = letter.upper()
-        if self.letter in GAMETILES.loc[:, "VALUE"]:
-            self.score = GAMETILES.loc[self.letter, 'VALUE']
+        if self.letter in game_tiles.loc[:, "VALUE"]:
+            self.score = game_tiles.loc[self.letter, 'VALUE']
         else:
             self.score = 0
 

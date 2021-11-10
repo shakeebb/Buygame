@@ -3,10 +3,10 @@ import random
 import pygame
 import thorpy
 
-from button import TextButton
-from dice import Dice
-from display import Display
-from gameconstants import *
+from gui.button import TextButton
+from gui.dice import Dice
+from gui.display import Display
+from common.gameconstants import *
 
 
 class BottomBar(Display):
@@ -19,10 +19,10 @@ class BottomBar(Display):
         # self.HEIGHT = 125 / 600 * h
         self.BORDER_THICKNESS = 5
         self.game = game
-        button_features = (3.5, 1.5, Colors.DARK_GRAY.value)
+        button_features = (3.5, 1.5, Colors.DARK_GRAY)
         self.backtome = TextButton(h_margin_cells + 1,
                                    v_margin_cells + 1, *button_features, " Return ",
-                                   Colors.ORANGE.value)
+                                   Colors.ORANGE)
         controls = [[(" Help ", -9, 1), (" Remove ", -5, 1)],
                     [("Create", -9, 3), (" Chat ", -5, 3)]
                     ]

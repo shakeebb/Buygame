@@ -6,7 +6,7 @@ import random
 
 import pygame
 
-from gameconstants import *
+from common.gameconstants import *
 
 
 class Dice:

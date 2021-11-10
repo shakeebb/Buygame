@@ -1,7 +1,7 @@
 import pygame
 
-from display import Display
-from gameconstants import VERBOSE
+from gui.display import Display
+from common.gameconstants import VERBOSE
 
 
 class Inventory(Display):

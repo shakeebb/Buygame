@@ -3,8 +3,10 @@ Top bar displaying information about round
 """
 import pygame
 
-from display import Display
-from gameconstants import *
+from common.logger import log
+from gui.display import Display
+from common.gameconstants import *
+from gui.button import TextButton
 
 
 class TopBar(Display):
@@ -17,7 +19,17 @@ class TopBar(Display):
         self.BORDER_THICKNESS = 5
         self.time = 60
         self.drawing = False
+        self.blink = False
+        from gui.base import GameUI
+        self.gameui: GameUI = None
         self.refresh_dims()
+        self.connect_status_color = Colors.YELLOW
+        self.connect_text = "Start"
+        self.connection_button = TextButton(self.xmargin() - 7,
+                                            self.v_margin_cells + int(self.height_cells / 2) - 1,
+                                            3, 2, self.connect_status_color, self.connect_text,
+                                            self.connect_status_color)
+        self.connection_button.change_font_size(15)
 
     def draw(self, win):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
@@ -35,6 +47,17 @@ class TopBar(Display):
         win.blit(txt,
                  (self.x + self.width / 2 - txt.get_width() / 2, self.y + self.height / 2 - txt.get_height() / 2 + 10))
 
+        if self.gameui is not None:
+            if self.gameui.network.is_connected:
+                self.set_connection_status(Colors.GREEN)
+            else:
+                self.set_connection_status(Colors.RED)
+                # self.button = pygame.draw.rect(win, self.color, self.start_button_pos, 0)
+                self.blink = True
+
+        self.connection_button.set_color(self.connect_status_color)
+        self.connection_button.set_text(self.connect_text)
+        self.connection_button.draw(win)
         pygame.draw.circle(win, (0, 0, 0), (self.x + self.width - 50, self.y + round(self.height / 2)), 30,
                            self.BORDER_THICKNESS)
         timer = self.round_font.render(str(self.time), 1, (0, 0, 0))
@@ -62,4 +85,34 @@ class TopBar(Display):
     def refresh_dims(self):
         super().refresh_dims()
         if VERBOSE:
-            print("TopBar ht = %s, y = %s" % (self.height, self.y))
+            log("TopBar ht = %s, y = %s" % (self.height, self.y))
+
+    def button_events(self):
+        """
+        handle all button press events here
+        :return: None
+        """
+        mouse = pygame.mouse.get_pos()
+        if self.connect_status_color is Colors.YELLOW and self.connection_button.click(*mouse):
+            try:
+                myGame = self.gameui.network.send(ClientMsg.Start.msg)
+                if myGame is not None and self.gameui.network.is_connected:
+                    self.gameui.game = myGame
+                    self.set_connection_status(Colors.GREEN, True)
+            except Exception as e:
+                log(str(e))
+        elif self.connect_status_color is Colors.RED and self.connection_button.click(*mouse):
+            try:
+                self.gameui.network.reconnect()
+                self.gameui.game = self.gameui.network.send(ClientMsg.Get.msg)
+                self.set_connection_status(Colors.GREEN)
+            except Exception as e:
+                log(str(e))
+
+    def set_connection_status(self, s: Colors, override: bool = False):
+        if self.connect_status_color is not Colors.YELLOW or override is True:
+            self.connect_status_color = s
+            if s is Colors.GREEN:
+                self.connect_text = "Connected"
+            if s is Colors.RED:
+                self.connect_text = "ReConnect"

@@ -1,21 +1,22 @@
+import logging
 import os
-
-from pygame.locals import *
 
 import pygame
 import sys
-from bottom_bar import BottomBar
-from chat import Chat
-from display import Display
-from leaderboard import Leaderboard
-from player import Player
-from snap import Inventory
-from top_bar import TopBar
-from gameconstants import *
+from gui.bottom_bar import BottomBar
+from gui.chat import Chat
+from common import network
+from common.game import *
+from common.logger import log, Log, logger
+from gui.display import Display
+from gui.leaderboard import Leaderboard
+from gui.snap import Inventory
+from gui.top_bar import TopBar
+from common.gameconstants import *
 
 
-class Game:
-    def __init__(self):
+class GameUI:
+    def __init__(self, name: str):
         Display.init()
         self.tileID = 0
         self.surface = Display.surface()
@@ -36,7 +37,7 @@ class Game:
         # self.inventory = Inventory(self.leaderboard.xmargin(), display_height * 300 / 600,
         # 75, 1, 10, Colors.GRAY.value)
         # self.inventory = Inventory(display_width * 0.08, display_height * 300 / 600, 75, 1, 10, Colors.GRAY.value)
-        self.bag = Bag(self.leaderboard.xmargin()/3, self.leaderboard.ymargin() + 1, 2)
+        self.bag = Bag(self.leaderboard.xmargin() / 3, self.leaderboard.ymargin() + 1, 2)
         # self.chat = Chat(display_width * 670 / 800, display_height * 100 / 600, self)
 
         # self.backgroundTiles = pygame.sprite.Group()
@@ -54,13 +55,14 @@ class Game:
                                    self.bottom_bar.v_margin_cells + 5,
                                    self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 5, Colors.RED.value)
 
-        self.players = [Player("SHAK"), Player("ALICE"), Player("NANCY"), Player("CLIFTON"), Player("SOUBHIK CHAKRABORTY")]
-        self.leaderboard.players = self.players
+        # self.players = [PlayerGUI("SHAK"), PlayerGUI("ALICE"), PlayerGUI("NANCY"), PlayerGUI("CLIFTON"), PlayerGUI("SOUBHIK CHAKRABORTY")]
+        # self.leaderboard.players = self.players
         self.top_bar.change_round(1)
         self.tileList = pygame.sprite.Group()
-
-        w, h = Display.dims()
-        # self.bag = pygame.sprite.Group()
+        self.network: network.Network = None
+        self.player_name = name
+        self.player_number = -1
+        self.game: Game = None
 
     def draw(self):
         self.surface.fill(BG_COLOR)
@@ -118,7 +120,6 @@ class Game:
 
     def main(self):
         pygame.display.set_caption('beta version BuyGame')
-        w, h = Display.dims()
         # self.box = thorpy.Box(elements=[slider,button1])
         #
         # #we regroup all elements on a menu, even if we do not launch the menu
@@ -135,6 +136,24 @@ class Game:
         mousey = 0  # used to store y coordinate of mouse event
         # letter = 'C'
         FONT = pygame.font.SysFont('comicsans', 100)
+        logger.reset()
+        try:
+            self.network = network.Network()
+            log("we connected to network")
+            log(self.network.p)
+            self.player_number = self.network.p
+            self.network.send(ClientMsg.Name.msg + self.player_name)
+            myGame: Game = self.network.send(ClientMsg.Get.msg)
+            if myGame is not None:
+                self.game = myGame
+                self.leaderboard.players = self.game.getPlayers()
+                self.top_bar.gameui = self
+            else:
+                raise TypeError("Game object not received")
+        except Exception as e:
+            log(e)
+            log("couldnt connect")
+            sys.exit("Cant connect to host")
 
         while True:  # main game loop
             if self.tileID % 2:
@@ -145,34 +164,38 @@ class Game:
             for event in pygame.event.get():  # event handling loop
                 if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
                     pygame.quit()
+                    self.network.disconnect()
                     sys.exit()
 
                 if event.type == VIDEORESIZE:
                     Display.resize(event, self.refresh_resolution)
 
                 if event.type == EV_DICE_ROLL:
-                    print("Received Roll dice event") if VERBOSE else None
+                    log("Received Roll dice event") if VERBOSE else None
                     self.bottom_bar.roll_dice()
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
                     x, y = pos
                     selected = self.check_clicks()
+                    self.top_bar.button_events()
                     self.bottom_bar.button_events()
                     if event.button == 1:
                         boxpos = self.inventory.Get_pos()
                         if self.inventory.In_grid(boxpos[0], boxpos[1]):
-                            print("in grid")
-                            print(self.inventory.items)
+                            log("in grid")
+                            log(self.inventory.items)
                     if event.button == 3:
                         self.tileList.add(Tile(x, y, self.tileID, letter, 1))
                         self.tileID += 1
+
                 if event.type == pygame.MOUSEBUTTONUP:
                     boxpos = self.inventory.Get_pos()
                     for tile in self.tileList:
                         tile.clicked = False
                     if selected and self.inventory.In_grid(boxpos[0], boxpos[1]):
                         self.inventory.Add(selected, boxpos)
+
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
                         self.chat.update_chat()
@@ -199,8 +222,8 @@ class Tile(pygame.sprite.Sprite):
     def __init__(self, xpos, ypos, id, letter='C', score=None):
         super(Tile, self).__init__()
         self.id = id
-        self.original = pygame.image.load(os.path.join("Tiles", f"{letter}.png"))
-        self.image = pygame.image.load(os.path.join("Tiles", f"{letter}.png"))
+        self.original = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
+        self.image = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
         self.size = self.image.get_size()
         self.image = pygame.transform.scale(self.image, (50, 50))
         self.size = self.image.get_size()
@@ -228,7 +251,8 @@ class Tile(pygame.sprite.Sprite):
 class Bag(Display):
     def __init__(self, h_margin_cells, v_margin_cells, num_cells):
         super().__init__(h_margin_cells, v_margin_cells, num_cells, num_cells)
-        self.image = pygame.image.load(os.path.join("Tiles", "bag-4.png")).convert()
+        path = os.path.dirname(__file__)
+        self.image = pygame.image.load(os.path.join(path, "tiles", "bag-4.png")).convert()
         im_sz = num_cells * Display.TILE_SIZE
         self.image = pygame.transform.scale(self.image, (im_sz, im_sz))
         # self.image = pygame.transform.scale(
@@ -252,5 +276,5 @@ class Bag(Display):
 
 
 if __name__ == "__main__":
-    g = Game()
+    g = GameUI("Test")
     g.main()
