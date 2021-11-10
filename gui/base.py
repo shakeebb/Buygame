@@ -3,6 +3,9 @@ import os
 
 import pygame
 import sys
+
+from pygame.surface import Surface
+
 from gui.bottom_bar import BottomBar
 from gui.chat import Chat
 from common import network
@@ -63,6 +66,9 @@ class GameUI:
         self.player_name = name
         self.player_number = -1
         self.game: Game = None
+        path = os.path.dirname(__file__)
+        self.tiles_sheet = SpriteSheet(os.path.join(path, "tiles", "all_tiles.png"))
+        self.sprite_tiles: list[list[Surface]] = self.tiles_sheet.crop_out_sprites()
 
     def draw(self):
         self.surface.fill(BG_COLOR)
@@ -139,8 +145,7 @@ class GameUI:
         logger.reset()
         try:
             self.network = network.Network()
-            log("we connected to network")
-            log(self.network.p)
+            log("we connected to network - player no " + str(self.network.p))
             self.player_number = self.network.p
             self.network.send(ClientMsg.Name.msg + self.player_name)
             myGame: Game = self.network.send(ClientMsg.Get.msg)
@@ -152,22 +157,20 @@ class GameUI:
                 raise TypeError("Game object not received")
         except Exception as e:
             log(e)
-            log("couldnt connect")
+            log("Couldn't connect")
             sys.exit("Cant connect to host")
 
+        pygame.event.clear()
         while True:  # main game loop
-            if self.tileID % 2:
-                letter = 'A'
-            else:
-                letter = 'B'
+            letter = chr(random.randint(65, 90))
             mouseClicked = False
             for event in pygame.event.get():  # event handling loop
                 if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
                     pygame.quit()
                     self.network.disconnect()
                     sys.exit()
-
                 if event.type == VIDEORESIZE:
+                    log("About to video resize")
                     Display.resize(event, self.refresh_resolution)
 
                 if event.type == EV_DICE_ROLL:
@@ -186,7 +189,7 @@ class GameUI:
                             log("in grid")
                             log(self.inventory.items)
                     if event.button == 3:
-                        self.tileList.add(Tile(x, y, self.tileID, letter, 1))
+                        self.tileList.add(Tile(x, y, self.tileID, self.sprite_tiles, letter, 1))
                         self.tileID += 1
 
                 if event.type == pygame.MOUSEBUTTONUP:
@@ -218,12 +221,39 @@ class GameUI:
             self.draw()
 
 
+class SpriteSheet:
+    def __init__(self, filename):
+        try:
+            self.sheet = pygame.image.load(filename).convert()
+        except pygame.error:
+            print("Unable to load: %s " % filename)
+            raise SystemExit
+
+    def crop_out_sprites(self, width: int = 128, height: int = 128):
+        all_sprites = [[pygame.Surface([width, height]) for _ in range(5)] for _ in range(6)]
+        for j in range(0, 6):
+            for i in range(0, 5):
+                surf = all_sprites[j][i]
+                surf.blit(self.sheet, (0,0), (i*width, j*height, width, height))
+                pygame.draw.rect(surf, Colors.BLACK.value, (0, 0, width-1, height-1), 1)
+        if VERBOSE:
+            for x in all_sprites:
+                for y in x:
+                    print(y.get_size())
+        return all_sprites
+
+
 class Tile(pygame.sprite.Sprite):
-    def __init__(self, xpos, ypos, id, letter='C', score=None):
+    def __init__(self, xpos, ypos, id, tile_sprites: list[list[Surface]], letter='C', score=None):
         super(Tile, self).__init__()
         self.id = id
-        self.original = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
-        self.image = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
+        self.all_tiles = tile_sprites
+        # self.original = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
+        row = int((ord(letter)-65) / 5)
+        col = int((ord(letter)-65) % 5)
+        self.image = self.all_tiles[row][col]
+        self.original = self.image
+        # self.image = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
         self.size = self.image.get_size()
         self.image = pygame.transform.scale(self.image, (50, 50))
         self.size = self.image.get_size()

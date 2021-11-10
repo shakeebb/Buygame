@@ -5,5 +5,5 @@
 *.json      text
 *.vcproj    text eol=crlf
 *.sh        text eol=lf
-*.jpg       binary
-*.png       binary
+*.jpg       binary -text diff
+*.png       binary -text diff
