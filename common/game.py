@@ -270,7 +270,7 @@ class Rack:
 
     def get_rack_str(self):
         # Displays the user's rack in string form.
-        return ", ".join(str(item.get_letter()) for item in self.rack)
+        return ", ".join(str(item.get_letter() if item is not None else "-") for item in self.rack)
 
     def get_rack_list(self):
         return [str(item.get_letter()) for item in self.rack]

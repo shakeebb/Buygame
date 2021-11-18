@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, Flag, auto
 
 import pygame as pg
 from pygame.constants import *
@@ -45,6 +45,12 @@ class Colors(Enum):
         self.B = b
 
 
+class Align(Flag):
+    RIGHT = auto()
+    LEFT = auto()
+    CENTER = auto()
+
+
 BG_COLOR = Colors.WHITE.value
 MAX_NAME_LENGTH = 10
 FONT_SIZE = 25
@@ -55,6 +61,7 @@ LB_DISP_FMT = " #%s %s [%s] "  # no, name [score]
 SURFACE_FLAGS = HWSURFACE | DOUBLEBUF  # | RESIZABLE
 
 EV_DICE_ROLL = pg.USEREVENT + 1
+EV_POST_START = EV_DICE_ROLL + 1
 
 
 class ClientMsg(Enum):
@@ -68,3 +75,13 @@ class ClientMsg(Enum):
 
     def __init__(self, text: str):
         self.msg = text
+
+
+class GameStatus(Enum):
+    INITIAL_STATE = auto()
+    PLAY = auto()
+    ROLL_DICE = auto()
+    DICE_ROLL_COMPLETE = auto()
+    WAIT_TURN = auto()
+    RECEIVE_RACKS = auto()
+    BUY = auto()

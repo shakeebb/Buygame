@@ -1,7 +1,8 @@
 import pygame
 
+from common.logger import log
 from gui.display import Display
-from common.gameconstants import VERBOSE
+from common.gameconstants import VERBOSE, INIT_TILE_SIZE
 
 
 class Inventory(Display):
@@ -11,7 +12,8 @@ class Inventory(Display):
             print("Inv: %s %s W %s" % (h_margin_cells, v_margin_cells, width_cells))
         self.rows = rows
         self.col = cols
-        self.items = [[None for _ in range(self.rows)] for _ in range(self.col)]
+        from gui.base import Tile
+        self.items: [[Tile]] = [[None for _ in range(self.col)] for _ in range(self.rows)]
         self.box_size = Display.TILE_SIZE * size
         self.border = 3
         self.color = color
@@ -25,23 +27,28 @@ class Inventory(Display):
         pygame.draw.rect(win, self.color,
                          (self.x, self.y, (self.box_size + self.border) * self.col + self.border,
                           (self.box_size + self.border) * self.rows + self.border))
-        for x in range(self.col):
-            for y in range(self.rows):
-                rect = (self.x + (self.box_size + self.border) * x + self.border,
-                        self.y + (self.box_size + self.border) * y + self.border, self.box_size, self.box_size)
+        for x in range(self.rows):
+            for y in range(self.col):
+                rect = (self.x + (self.box_size + self.border) * y + self.border,
+                        self.y + (self.box_size + self.border) * x + self.border, self.box_size, self.box_size)
                 pygame.draw.rect(win, (180, 180, 180), rect)
 
-                if self.items[x][y]:
-
-                    if self.items[x][y].clicked:
+                if self.items[x][y] is not None:
+                    from gui.base import Tile
+                    __t: Tile = self.items[x][y]
+                    if __t.clicked:
                         pos = pygame.mouse.get_pos()
                         self.items[x][y].rect.x = pos[0] - (self.items[x][y].rect.width / 2.4)
                         self.items[x][y].rect.y = pos[1] - (self.items[x][y].rect.height / 2.4)
+                        __t.init = False
                         break  # prevents more than one tile at a time
+                    elif __t.init:
+                        __t.update_rect(self.x + ((self.box_size + self.border) * (y + 0.5)),
+                                        rect[1] + INIT_TILE_SIZE)
                     elif self.items[x][y].inBox(self):
                         self.items[x][y].rect.topleft = (self.x + (x * (self.box_size + self.border)), self.y)
-                    else:
-                        self.items[x][y] = None
+                    # else:
+                    #     self.items[x][y] = None
         self.tilegroup.draw(win)
         # self.items[x][y].image = pygame.transform.scale(self.items[x][y].image, (100,100))
 
@@ -60,7 +67,7 @@ class Inventory(Display):
     def Add(self, Item, xy):
         x, y = xy
         # item already there
-        if self.items[x][y]:
+        if self.items[x][y] is not None:
             # if self.items[x][y].letter == Item.letter:
             #     print("same letter")
             #     print(Item.letter)
@@ -70,9 +77,10 @@ class Inventory(Display):
             #
             #     print("different letters are ")
             #     return temp
-            print("tile already there")
+            log("tile already there")
         else:
             self.items[x][y] = Item
+            self.tilegroup.add(Item)
 
     # check whether the mouse in in the grid
     def In_grid(self, x, y):

@@ -153,13 +153,13 @@ class Network:
                 log(e)
                 log("failed to connect")
                 self.is_connected = False
-                pass
+                return 0
 
     def disconnect(self):
         self.hb_event.set()
         self.hb_thread.join()
 
-    def send(self, data: str):
+    def send(self, data: str) -> object:
         if not self.is_connected:
             log("Automatically Reconnecting")
             self.reconnect()

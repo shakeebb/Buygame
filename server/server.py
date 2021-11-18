@@ -4,11 +4,13 @@ Created on Fri Mar 26 13:40:58 2021
 
 @author: Boss
 """
+import datetime
 import pickle
 import socket
 import os
 # import thread module
 from _thread import *
+from threading import Event
 
 import pandas as pd
 
@@ -18,6 +20,9 @@ import pandas as pd
 from common.game import *
 from common.gameconstants import *
 from common.logger import log
+from datetime import  datetime
+
+from server.socket import ClientSocket
 
 script_path = os.path.dirname(os.path.abspath(__file__))
 GAMETILES = pd.read_csv(os.path.join(script_path, "tiles.csv"), index_col="LETTER")
@@ -38,7 +43,7 @@ server_socket.bind((IP, PORT))
 server_socket.listen(4)
 print("server started.....")
 nofw = 4
-sockets_list = [server_socket]
+client_sockets_list: [ClientSocket] = []
 clients = {}
 number_of_usr = 0
 waitingForGameToStart = True
@@ -47,7 +52,6 @@ gameId = 0
 
 
 # %%
-
 
 def createMessage(message):
     message = f"{len(message):<{MSG_HEADER_LENGTH}}".encode(
@@ -97,23 +101,23 @@ def receive_pickle(client_socket):
 # %%
 
 
-def threaded(c, p, gameId):
+def threaded(_cs: ClientSocket, _game_id):
     global number_of_usr
     # c is socket
-    stringp = str(p)
+    stringp = str(_cs.player_num)
     print(f"connected is player {stringp}")
     p = createMessage(stringp)
-    c.send(p)
-    while True:
+    _cs.socket.send(p)
+    while _cs.is_active:
         try:
             # data received from client
-            data = receive_message(c)
+            data = receive_message(_cs.socket)
             if data:
                 print(f"received {data}")
                 decodedP = int(p.decode('utf-8')[-1])
                 print("[DATA From Player:]", decodedP)
-                # if gameId in games:
-                currentgame = games[gameId]
+                # if _game_id in games:
+                currentgame = games[_game_id]
                 n = len(currentgame.clients)
                 if data is not False:
 
@@ -121,7 +125,8 @@ def threaded(c, p, gameId):
                     if ClientMsg.HeartBeat.msg == data:
                         if VERBOSE:
                             log("sending heartbeat response")
-                        c.sendall(createMessage(ClientMsg.HeartBeat.msg))
+                        _cs.socket.sendall(createMessage(ClientMsg.HeartBeat.msg))
+                        _cs.set_last_active_ts()
                         continue
                     elif data == "start":
                         log("player wants to start game ")
@@ -141,7 +146,7 @@ def threaded(c, p, gameId):
                             playerIndex = random.randint(0, n - 1)
                             currentgame.setPlayer(playerIndex)
                             currentgame.setReady(playerIndex)
-                            games[gameId] = currentgame
+                            games[_game_id] = currentgame
                             currentgame.setServerMessage(
                                 "game ready to start ")
                         # %%
@@ -171,7 +176,7 @@ def threaded(c, p, gameId):
                             currentgame.setRacks(diceValue)
                             currentgame.setServerMessage("Racks Ready")
                             log("handed racks to all")
-                            games[gameId] = currentgame
+                            games[_game_id] = currentgame
                             for player in currentgame.getPlayers():
                                 try:
                                     log(player.get_rack_str())
@@ -208,10 +213,11 @@ def threaded(c, p, gameId):
                     # %%
                     elif "Played" in data:
                         currentgame.getPlayer(decodedP).played = True
-                    games[gameId] = currentgame
+                    games[_game_id] = currentgame
                     serverMessage = currentgame.getServerMessage()
                     log(f"serverMessage: {serverMessage} ")
-                    c.sendall(createPickle((currentgame)))
+                    _cs.socket.sendall(createPickle((currentgame)))
+                    _cs.set_last_active_ts()
         except Exception as e:
             print(e)
             # %%
@@ -219,7 +225,28 @@ def threaded(c, p, gameId):
     print("lost connection")
     number_of_usr -= 1
     # connection closed
-    c.close()
+    _cs.socket.close()
+
+
+cleanup_interval = Event()
+
+
+def cleanup_thread():
+    while not cleanup_interval.is_set():
+        curr_ts = datetime.now()
+        i = len(client_sockets_list) - 1
+        while i >= 0:
+            print(f"i = {i} and cslist = {len(client_sockets_list)}")
+            _cs = client_sockets_list[i]
+            # if we miss 5 heartbeats in a row, time to close that socket
+            x = (curr_ts - _cs.last_hb_received).total_seconds()
+            y = (HEARTBEAT_INTERVAL_SECS * 2.0)
+            if x > y:
+                print(f"Cleaning up {cs.player_num}th player socket")
+                stale = client_sockets_list.pop(i)
+                stale.mark_inactive()
+            i -= 1
+        cleanup_interval.wait(HEARTBEAT_INTERVAL_SECS)
 
 
 # Waiting for players to join lobby and to start game
@@ -228,10 +255,12 @@ while True:
     client_socket, client_address = server_socket.accept()
     # adding client socket to list of users
     print(f"[CONNECTION] {client_address} connected!")
-    sockets_list.append(client_socket)
+    cs = ClientSocket(client_socket, len(client_sockets_list))
+    client_sockets_list.append(cs)
     if number_of_usr == 0:
         print("Creating a new game....")
         games[gameId] = Game(gameId, GAMETILES)
+        start_new_thread(cleanup_thread, ())
     print("creating player object...")
     # Giving player their own socket in dictionary 
     clients[number_of_usr] = Player(int(nofw), int(number_of_usr), games[gameId].getGameBag())
@@ -240,6 +269,6 @@ while True:
     games[gameId].setClients(clients)
     print("setting clients to game \n sending game to client")
     # sending game to player 
-    start_new_thread(threaded, (client_socket, number_of_usr, gameId))
+    start_new_thread(threaded, (cs, gameId))
     print("game sent to client ")
     number_of_usr += 1

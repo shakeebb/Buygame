@@ -6,6 +6,8 @@ import sys
 
 from pygame.surface import Surface
 
+import common
+from common.client_utils import ClientUtils
 from gui.bottom_bar import BottomBar
 from gui.chat import Chat
 from common import network
@@ -64,11 +66,12 @@ class GameUI:
         self.tileList = pygame.sprite.Group()
         self.network: network.Network = None
         self.player_name = name
-        self.player_number = -1
-        self.game: Game = None
+        self.my_player_number = -1
+        self.__game: Game = None
         path = os.path.dirname(__file__)
         self.tiles_sheet = SpriteSheet(os.path.join(path, "tiles", "all_tiles.png"))
         self.sprite_tiles: list[list[Surface]] = self.tiles_sheet.crop_out_sprites()
+        self.game_status = GameStatus.INITIAL_STATE
 
     def draw(self):
         self.surface.fill(BG_COLOR)
@@ -146,12 +149,12 @@ class GameUI:
         try:
             self.network = network.Network()
             log("we connected to network - player no " + str(self.network.p))
-            self.player_number = self.network.p
+            self.my_player_number = self.network.p
             self.network.send(ClientMsg.Name.msg + self.player_name)
-            myGame: Game = self.network.send(ClientMsg.Get.msg)
-            if myGame is not None:
-                self.game = myGame
-                self.leaderboard.players = self.game.getPlayers()
+            ret = self.network.send(ClientMsg.Get.msg)
+            if ret is not None:
+                self.set_game(ret)
+                self.leaderboard.players = self.game().getPlayers()
                 self.top_bar.gameui = self
             else:
                 raise TypeError("Game object not received")
@@ -176,6 +179,9 @@ class GameUI:
                 if event.type == EV_DICE_ROLL:
                     log("Received Roll dice event") if VERBOSE else None
                     self.bottom_bar.roll_dice()
+
+                if event.type == EV_POST_START:
+                    self.game_status = GameStatus.PLAY
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
@@ -209,6 +215,58 @@ class GameUI:
                         key_name = key_name.lower()
                         self.chat.type(key_name)
                 # menu.react(event)
+            # %% end of event loop
+
+            def sever_notify(msg: str, color: Colors = Colors.BLACK):
+                self.top_bar.server_msg.set_text(msg)
+
+            def client_notify(msg: str, color: Colors = Colors.BLACK):
+                self.top_bar.client_msgs.add_msg(msg, color)
+
+            if self.game_status == GameStatus.PLAY:
+                self.game_status = ClientUtils.check_game_events(self.game(),
+                                                                 self.my_player_number,
+                                                                 self.network,
+                                                                 sever_notify,
+                                                                 client_notify)
+
+            if self.game_status == GameStatus.ROLL_DICE:
+                self.bottom_bar.enable_dice_rolling()
+
+            if self.game_status == GameStatus.DICE_ROLL_COMPLETE:
+                diceValue = str(self.bottom_bar.last_rolled_dice_no)
+                diceMessage: str = ClientMsg.Dice.msg + diceValue
+                try:
+                    self.set_game(self.network.send(diceMessage))
+                    self.game_status = GameStatus.PLAY
+                except Exception as e:
+                    log(e)
+
+            def process_rack(rack: [common.game.Tile], temp=False):
+                slot = 0
+                for rT in rack:
+                    inv = self.myrack if temp else self.inventory
+                    _tile = Tile(inv.x, inv.y, self.tileID, self.sprite_tiles, rT.letter, 1)
+                    xxx = inv.items[0]
+                    print(xxx)
+                    if slot < len(inv.items[0]):
+                        inv.Add(_tile, (0, slot))
+                    slot += 1
+                    # if not temp:
+                    #     self.myrack.tilegroup.add(_tile)
+                    # else:
+                    #     self.inventory.tilegroup.add(_tile)
+
+            if self.game_status == GameStatus.RECEIVE_RACKS:
+                try:
+                    player = self.game().getPlayer(self.my_player_number)
+                    self.game_status = ClientUtils.receivedRacks(player, self.network, self.my_player_number,
+                                                                 sever_notify, client_notify,
+                                                                 process_rack)
+                    # ?? self.set_game(network.send("Done"))
+                except Exception as e:
+                    log(e)
+
             for tile in self.tileList:
                 if tile.clicked:
                     # center tile on mouse and move around
@@ -219,6 +277,14 @@ class GameUI:
             # box.blit()
             # box.update()
             self.draw()
+
+    def set_game(self, _g: object):
+        assert isinstance(_g, Game)
+        self.__game = _g
+        self.top_bar.server_msg.set_text(self.__game.getServerMessage())
+
+    def game(self) -> Game:
+        return self.__game
 
 
 class SpriteSheet:
@@ -249,8 +315,12 @@ class Tile(pygame.sprite.Sprite):
         self.id = id
         self.all_tiles = tile_sprites
         # self.original = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
-        row = int((ord(letter)-65) / 5)
-        col = int((ord(letter)-65) % 5)
+        if "WILD" in letter:
+            row = 5
+            col = 3
+        else:
+            row = int((ord(letter)-65) / 5)
+            col = int((ord(letter)-65) % 5)
         self.image = self.all_tiles[row][col]
         self.original = self.image
         # self.image = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
@@ -259,11 +329,11 @@ class Tile(pygame.sprite.Sprite):
         self.size = self.image.get_size()
         self.clicked = False
         self.rect = self.image.get_rect()
-        self.rect.y = ypos - self.rect.height / 2
-        self.rect.x = xpos - self.rect.height / 2
+        self.update_rect(xpos, ypos)
         self.score = score
         self.letter = letter
         self.inabox = False
+        self.init = True
 
     def inBox(self, inventory):
         box_size = 75
@@ -276,6 +346,13 @@ class Tile(pygame.sprite.Sprite):
         # print(f"Tile Position is {x} and {y}")
         self.inabox = inventory.In_grid(x, y)
         return self.inabox
+
+    def update_rect(self, xpos, ypos):
+        self.rect.x = xpos - self.rect.width / 2
+        self.rect.y = ypos - self.rect.height / 2
+        __r = self.original.get_rect()
+        __r.x = self.rect.x
+        __r.y = self.rect.y
 
 
 class Bag(Display):

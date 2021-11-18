@@ -8,6 +8,7 @@ import sys
 import time
 
 from common import *
+from common.game import Game
 from common.gameconstants import ClientMsg
 
 nofw = 4
@@ -152,7 +153,7 @@ def main():
         # %%  lobby
 
         while inLobby:
-            myGame = n.send("get")
+            myGame: Game = n.send("get")
             if not nameEntered:
                 myName = ClientMsg.Name.msg + str(input("enter your name: "))
 

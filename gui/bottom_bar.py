@@ -18,7 +18,8 @@ class BottomBar(Display):
         # self.WIDTH = 660 / 800 * w
         # self.HEIGHT = 125 / 600 * h
         self.BORDER_THICKNESS = 5
-        self.game = game
+        from gui.base import GameUI
+        self.game: GameUI = game
         button_features = (3.5, 1.5, Colors.DARK_GRAY)
         self.backtome = TextButton(h_margin_cells + 1,
                                    v_margin_cells + 1, *button_features, " Return ",
@@ -44,6 +45,8 @@ class BottomBar(Display):
                                      *button_features, controls[1][1][0])
 
         self.dice: Dice = None
+        self.__enable_dice_rolling = False
+        self.last_rolled_dice_no = -1
 
     def refresh_dims(self):
         super().refresh_dims()
@@ -75,9 +78,7 @@ class BottomBar(Display):
         :return: None
         """
         mouse = pygame.mouse.get_pos()
-        self.dice = None if self.dice and not self.dice.is_dice_rolling() else self.dice
-
-        if self.help_button.click(*mouse):
+        if self.__enable_dice_rolling and self.help_button.click(*mouse):
             # choices = [("Choose Dice ", self.choose_dice()), ("cancel", None)]
             # thorpy.launch_blocking_choices("Help!\n",
             #                                choices)
@@ -100,4 +101,28 @@ class BottomBar(Display):
         if self.dice:
             self.dice.continue_rolling()
             if not self.dice.is_dice_rolling():
-                self.game.chat.update_chat("Rolled to: " + str(self.dice.get_rolled_dice_no()))
+                diceValue = self.dice.get_rolled_dice_no()
+                self.game.top_bar.client_msgs.add_msg("Dice Rolled to: "
+                                                      + str(diceValue))
+                if diceValue not in [2, 3, 4, 5]:
+                    diceValue = self.prompt_input()
+                self.last_rolled_dice_no = diceValue
+                self.disable_dice_rolling()
+
+    def prompt_input(self):
+        self.game.top_bar.client_msgs.add_msg("Your Choice. Enter between 2 to 5")
+        # enable input field & validate
+        return random.randint(2, 5)
+
+    def enable_dice_rolling(self):
+        self.last_rolled_dice_no = -2
+        self.__enable_dice_rolling = True
+        self.help_button.set_text(" ROLL ")
+        self.help_button.set_color(Colors.GREEN)
+
+    def disable_dice_rolling(self):
+        self.__enable_dice_rolling = False
+        self.dice = None
+        self.help_button.set_text("  Help ")
+        self.help_button.set_color(Colors.DARK_GRAY)
+        self.game.game_status = GameStatus.DICE_ROLL_COMPLETE
