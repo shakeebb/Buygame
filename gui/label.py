@@ -68,4 +68,4 @@ class MessageList(Display):
                          (self.x, self.y, self.width, self.height), 1,
                          2, 2, 2, 2, 2)
         for i, m in enumerate(self.list):
-            win.blit(m, (self.x + 10, self.y + i * 20))
+            win.blit(m, (self.x + 10, self.y + i * 15))

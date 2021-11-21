@@ -77,6 +77,7 @@ class Display(pygame.sprite.Sprite):
     __i: __disp__ = None
 
     def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells):
+        super(Display, self).__init__()
         self.h_margin_cells = h_margin_cells
         self.v_margin_cells = v_margin_cells
         self.width_cells = width_cells
@@ -85,6 +86,7 @@ class Display(pygame.sprite.Sprite):
         self.y = 0
         self.width = 0
         self.height = 0
+        self._layer = 1
         Display.refresh_dims(self)
 
     def xmargin(self):

@@ -14,7 +14,7 @@ class Leaderboard(Display):
         self.name_font = pygame.font.SysFont("comicsans", 25, bold=True)
         self.score_font = pygame.font.SysFont("comicsans", 20)
         self.rank_font = pygame.font.SysFont("comicsans", 25)
-        self.players: Player = []
+        self.players: [Player] = []
         self.BORDER_THICKNESS = 5
         self.refresh_dims()
 
@@ -31,7 +31,7 @@ class Leaderboard(Display):
                   " width = %s " % (self.height, self.y, self.y_margin, self.width))
 
     def draw(self, win):
-        scores = [(player.number, player.name, player.score) for player in self.players]
+        scores = [(player.number, player.name, player.money) for player in self.players]
         scores.sort(key=lambda x: x[1], reverse=True)
         num_scores = len(scores)
         for i in range(LB_TOP_N):  # show only top 'n' scores

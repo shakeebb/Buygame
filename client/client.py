@@ -9,7 +9,7 @@ import time
 
 from common import *
 from common.game import Game
-from common.gameconstants import ClientMsg
+from common.gameconstants import ClientMsgReq, ClientResp
 
 nofw = 4
 status = ""
@@ -18,11 +18,6 @@ user_ans = ""
 
 
 def receivedRacks(myPlayer, n, myNumber):
-    Dice = "Dice: "
-    Bought = "buying racks "
-    Sold = "Sold: "
-    get = "get"
-    Iplayed = "Played"
     print("Your rack contains: ")
     for tile in myPlayer.get_rack_arr():
         print(tile.letter, tile.score)
@@ -42,17 +37,17 @@ def receivedRacks(myPlayer, n, myNumber):
             if user_ans == "Y":
                 print("user wants to buy")
                 try:
-                    myGame = n.send(Bought)
+                    myGame = n.send(ClientMsgReq.Buy.msg)
                 except Exception as e:
                     print(e)
                 while True:
                     serverMessage = myGame.getServerMessage()
                     print(f"serverMessage: {serverMessage} ")
-                    if "Purchased" in serverMessage:
+                    if ClientResp.Bought.msg in serverMessage:
                         break
                     else:
                         try:
-                            myGame = n.send(get)
+                            myGame = n.send(ClientMsgReq.Get.msg)
                         except Exception as e:
                             continue
                 myPlayer = myGame.getPlayer(myNumber)
@@ -74,17 +69,17 @@ def receivedRacks(myPlayer, n, myNumber):
             myPlayer.sell(wordToSell)
 
             if myPlayer.sell_check:
-                Sold += wordToSell
-                myGame = n.send(Sold)
+                sell_msg = ClientMsgReq.Sell.msg + wordToSell
+                myGame = n.send(sell_msg)
                 time.sleep(1)
                 # myGame = n.send(Sold)
                 # time.sleep(1)
                 while True:
-                    myGame = n.send(get)
+                    myGame = n.send(ClientMsgReq.Get.msg)
                     time.sleep(1)
                     serverMessage = myGame.getServerMessage()
                     print(f"serverMessage: {serverMessage} ")
-                    if "SOLD" in serverMessage:
+                    if ClientResp.Sold.msg in serverMessage:
                         break
                 myPlayer = myGame.getPlayer(myNumber)
 
@@ -99,7 +94,7 @@ def receivedRacks(myPlayer, n, myNumber):
         print("You now have: $", myPlayer.money)
         # %% done selling
         # sending player object to game
-    myGame = n.send(Iplayed)
+    myGame = n.send(ClientMsgReq.Played.msg)
     return myGame
     # %%
 
@@ -136,7 +131,7 @@ def main():
             print(f"round {i}")
         # if firstRun:
         try:
-            myGame = n.send("get")
+            myGame = n.send(ClientMsgReq.Get.msg)
         except Exception as e:
             # run = False
             print("cant get game")
@@ -153,9 +148,10 @@ def main():
         # %%  lobby
 
         while inLobby:
-            myGame: Game = n.send("get")
+            myGame = n.send(ClientMsgReq.Get.msg)
+            assert isinstance(myGame, Game)
             if not nameEntered:
-                myName = ClientMsg.Name.msg + str(input("enter your name: "))
+                myName = ClientMsgReq.Name.msg + str(input("enter your name: "))
 
                 try:
                     myGame = n.send(myName)
@@ -168,7 +164,7 @@ def main():
                 if "READY" in user_ans:
                     try:
                         iReady = True
-                        myGame = n.send("start")
+                        myGame = n.send(ClientMsgReq.Start.msg)
                         time.sleep(1)
                     except Exception as e:
                         print(e)
@@ -196,19 +192,19 @@ def main():
             serverMessage = myGame.getServerMessage()
 
             # %% racks are handed
-            if "Racks" in serverMessage:
+            if ClientResp.Racks_Ready.msg in serverMessage:
                 try:
                     myPlayer = myGame.getPlayer(myNumber)
                     myGame = receivedRacks(myPlayer, n, myNumber)
-                    myGame = n.send("Done")
+                    myGame = n.send(ClientMsgReq.Is_Done.msg)
                 except Exception as e:
                     print(e)
             # players could be done
             # %%
-            if "Done" in myGame.getServerMessage():
+            if ClientResp.Done.msg in myGame.getServerMessage():
                 print(f"round {i} done, time for next round ")
                 i += 1
-            elif "not ready" in myGame.getServerMessage():
+            elif ClientResp.Not_Ready.msg in myGame.getServerMessage():
                 print(myGame.getServerMessage())
         # %%
         else:
@@ -219,7 +215,7 @@ def main():
                 print("it is your turn to roll")
                 input("Press enter to roll dice:")
                 diceValue = str(game.dice_roll())
-                diceMessage = ClientMsg.Dice.msg + diceValue
+                diceMessage = ClientMsgReq.Dice.msg + diceValue
                 try:
                     myGame = n.send(diceMessage)
                 except Exception as e:

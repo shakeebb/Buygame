@@ -45,7 +45,9 @@ class TopBar(Display):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
 
         # draw round
-        txt = self.round_font.render(f"Round {self.round} of {self.max_round}", 1, (0, 0, 0))
+        txt = self.round_font.render(f"Player {self.gameui.my_player_number + 1} "
+                                     f"Round {self.round} of {self.max_round}",
+                                     True, Colors.BLACK.value)
         win.blit(txt, (self.x + 10, self.y + self.height / 2 - txt.get_height() / 2))
 
         # draw underscores
@@ -107,27 +109,29 @@ class TopBar(Display):
         mouse = pygame.mouse.get_pos()
         if self.connect_status_color is Colors.YELLOW and self.connection_button.click(*mouse):
             try:
-                myGame = self.gameui.network.send(ClientMsg.Start.msg)
+                myGame = self.gameui.network.send(ClientMsgReq.Start.msg)
                 if myGame is not None and self.gameui.network.is_connected:
                     self.gameui.set_game(myGame)
+                    log(f"SB: game server status : {myGame.ready}")
                     if self.gameui.game().ready:
                         color = Colors.GREEN
-                        self.client_msgs.add_msg(f"Game is ready. %s players connected" %
-                                                 len(self.gameui.game().getPlayers()),
+                        _g: Game = self.gameui.game()
+                        self.client_msgs.add_msg(f"Game is ready. {len(_g.getPlayers())} players connected."
+                                                 f" Leader is {_g.leader + 1}",
                                                  Colors.NAVY_BLUE)
                     else:
                         color = Colors.ORANGE
                     self.set_connection_status(color, True)
                     pygame.event.post(pygame.event.Event(EV_POST_START))
             except Exception as e:
-                log(e)
+                log("Start message failed", e)
         elif self.connect_status_color is Colors.RED and self.connection_button.click(*mouse):
             try:
                 self.gameui.network.reconnect()
-                self.gameui.game = self.gameui.network.send(ClientMsg.Get.msg)
+                self.gameui.game = self.gameui.network.send(ClientMsgReq.Get.msg)
                 self.set_connection_status(Colors.GREEN)
             except Exception as e:
-                log(e)
+                log("", e)
 
     def set_connection_status(self, s: Colors, override: bool = False):
         if self.connect_status_color is not Colors.YELLOW or override is True:

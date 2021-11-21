@@ -24,7 +24,7 @@ def createMessage(message: str):
         # needs message, HEADER_LENGTH
         # returns message ready for socket 
     except Exception as e:
-        log(e)
+        log("create message failed", e)
 
 
 def createPickle(aPickle):
@@ -46,7 +46,7 @@ def receive_pickle(client_socket):
         # print("unpickled", unpickled)
         return unpickled
     except Exception as e:
-        log(e)
+        log("deserialization failed", e)
         return False
 
 
@@ -59,7 +59,7 @@ def receive_message(client_socket):
         message_length = int(message_header.decode('utf-8').strip())
         return client_socket.recv(message_length).decode('utf-8')
     except Exception as e:
-        log(e)
+        log("receive message failed with", e)
         return False
 
 
@@ -72,12 +72,7 @@ class Network:
         self.port = 1234
         self.addr = (self.server, self.port)
         self.con_mutex = RLock()
-        self.hb_thread = Thread(target=self.heartbeat, name="heartbeat", daemon=True)
-        self.hb_event = Event()
-
         self.p = int(self.connect())
-
-        self.hb_thread.start()
         log("done initialize")
 
     def create_client_socket(self, try_close_existing=False):
@@ -93,38 +88,34 @@ class Network:
             soc.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             return soc
         except socket.error as se:
-            log(se)
+            log("client socket creation failed", se)
             return None
 
     def getP(self):
         return self.p
 
     def heartbeat(self):
-        while not self.hb_event.is_set():
-            with self.con_mutex:
-                try:
-                    if not self.is_connected:
-                        log("HB realised disconnection... reconnecting")
-                        self.reconnect()
-
-                    # if still not connected, loop
-                    if not self.is_connected:
-                        self.hb_event.wait(HEARTBEAT_INTERVAL_SECS)
-                        continue
-                    if VERBOSE:
-                        log("HB sending")
-                    self.client.send(createMessage(ClientMsg.HeartBeat.msg))
-                    resp = receive_message(self.client)
-                    if VERBOSE:
-                        log("HB received " + str(resp))
-                    if str(resp) == ClientMsg.HeartBeat.msg:
-                        self.is_connected = True
-                    elif bool(resp) is False:
-                        self.is_connected = False
-                except Exception as e:
-                    log(e)
+        with self.con_mutex:
+            try:
+                if not self.is_connected:
+                    log("HB realised disconnection... reconnecting")
+                    self.reconnect()
+                # if still not connected, return
+                if not self.is_connected:
+                    return
+                if VERBOSE:
+                    log("HB sending")
+                self.client.send(createMessage(ClientMsgReq.HeartBeat.msg))
+                resp = receive_message(self.client)
+                if VERBOSE:
+                    log("HB received " + str(resp))
+                if str(resp) == ClientMsgReq.HeartBeat.msg:
+                    self.is_connected = True
+                elif bool(resp) is False:
                     self.is_connected = False
-            self.hb_event.wait(HEARTBEAT_INTERVAL_SECS)
+            except Exception as e:
+                log("heartbeat failed with ", e)
+                self.is_connected = False
 
     def reconnect(self):
         with self.con_mutex:
@@ -135,7 +126,7 @@ class Network:
                 self.is_connected = True
                 log("client socket created")
             except Exception as e:
-                log(e)
+                log("reconnect failed with", e)
                 self.is_connected = False
 
     def connect(self):
@@ -150,21 +141,17 @@ class Network:
                 self.is_connected = True
                 return myNumber
             except Exception as e:
-                log(e)
-                log("failed to connect")
+                log("failed to connect", e)
                 self.is_connected = False
-                return 0
-
-    def disconnect(self):
-        self.hb_event.set()
-        self.hb_thread.join()
+                raise e
 
     def send(self, data: str) -> object:
-        if not self.is_connected:
-            log("Automatically Reconnecting")
-            self.reconnect()
-
+        sleepTime = 1
         while True:
+            if not self.is_connected:
+                log("Automatically Reconnecting")
+                self.reconnect()
+
             with self.con_mutex:
                 try:
                     # print("trying to send data to server")
@@ -180,9 +167,14 @@ class Network:
                     else:
                         return None
                 except socket.error as e:
-                    log(e)
+                    log("send failed with", e)
                     self.is_connected = False
-                    return None
+                    time.sleep(sleepTime)
+                    if sleepTime < MAX_RECONNECT_TIME:
+                        sleepTime *= 2
+                        continue
+                    else:
+                        raise e
 
     # def sendP(self, data):
     #     while True:

@@ -32,9 +32,9 @@ class BottomBar(Display):
                                       self.v_margin_cells + controls[0][0][2],
                                       *button_features, controls[0][0][0])
 
-        self.removebutton = TextButton(self.xmargin() + controls[0][1][1],
-                                       self.v_margin_cells + controls[0][1][2],
-                                       *button_features, controls[0][1][0])
+        self.remove_button = TextButton(self.xmargin() + controls[0][1][1],
+                                        self.v_margin_cells + controls[0][1][2],
+                                        *button_features, controls[0][1][0])
 
         self.createbutton = TextButton(self.xmargin() + controls[1][0][1],
                                        self.v_margin_cells + controls[1][0][2],
@@ -46,6 +46,8 @@ class BottomBar(Display):
 
         self.dice: Dice = None
         self.__enable_dice_rolling = False
+        self.__enable_buy = False
+        self.__enable_sell = False
         self.last_rolled_dice_no = -1
 
     def refresh_dims(self):
@@ -67,7 +69,7 @@ class BottomBar(Display):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
         self.help_button.draw(win)
         self.backtome.draw(win)
-        self.removebutton.draw(win)
+        self.remove_button.draw(win)
         self.createbutton.draw(win)
         self.chatbutton.draw(win)
         self.dice.draw() if self.dice else None
@@ -86,12 +88,38 @@ class BottomBar(Display):
                 self.dice = Dice(self.game, 200, 200, 100, 0.2)
                 self.dice.draw()
                 self.dice.roll(self.rand.randint(5, 15))
+                return
+
+        if self.__enable_buy:
+            if self.help_button.click(*mouse):
+                self.__enable_buy = False
+                self.game.game_status = GameStatus.BUY
+                self.revert_to_orig()
+                return
+            elif self.remove_button.click(*mouse):
+                self.__enable_buy = False
+                self.game.game_status = GameStatus.CANCEL_BUY
+                self.revert_to_orig()
+                return
+
+        if self.__enable_sell:
+            if self.help_button.click(*mouse):
+                self.__enable_sell = False
+                self.game.game_status = GameStatus.SELL
+                self.revert_to_orig()
+                return
+            elif self.remove_button.click(*mouse):
+                self.__enable_sell = False
+                self.game.game_status = GameStatus.CANCEL_SELL
+                self.revert_to_orig()
+                return
+
         if self.backtome.click(*mouse):
             self.game.myrack.returntome(self.game.tileList)
-        if self.removebutton.click(*mouse):
+        if self.remove_button.click(*mouse):
             self.game.tileList.empty()
         if self.createbutton.click(*mouse):
-            self.game.inventory.createWord()
+            self.game.inventory.get_word()
         if self.chatbutton.click(*mouse):
             choices = [("All", print("hi")), ("Friendly", print("friend")), ("Cancel", None)]
             thorpy.launch_blocking_choices("Chat!\n",
@@ -107,7 +135,10 @@ class BottomBar(Display):
                 if diceValue not in [2, 3, 4, 5]:
                     diceValue = self.prompt_input()
                 self.last_rolled_dice_no = diceValue
-                self.disable_dice_rolling()
+                self.__enable_dice_rolling = False
+                self.dice = None
+                self.game.game_status = GameStatus.DICE_ROLL_COMPLETE
+                self.revert_to_orig()
 
     def prompt_input(self):
         self.game.top_bar.client_msgs.add_msg("Your Choice. Enter between 2 to 5")
@@ -120,9 +151,22 @@ class BottomBar(Display):
         self.help_button.set_text(" ROLL ")
         self.help_button.set_color(Colors.GREEN)
 
-    def disable_dice_rolling(self):
-        self.__enable_dice_rolling = False
-        self.dice = None
+    def revert_to_orig(self):
         self.help_button.set_text("  Help ")
         self.help_button.set_color(Colors.DARK_GRAY)
-        self.game.game_status = GameStatus.DICE_ROLL_COMPLETE
+        self.remove_button.set_text(" Remove ")
+        self.remove_button.set_color(Colors.DARK_GRAY)
+
+    def enable_buy(self):
+        self.__enable_buy = True
+        self.help_button.set_text(" BUY ")
+        self.help_button.set_color(Colors.GREEN)
+        self.remove_button.set_text(" CANCEL ")
+        self.remove_button.set_color(Colors.GREEN)
+
+    def enable_sell(self):
+        self.__enable_sell = True
+        self.help_button.set_text(" SELL ")
+        self.help_button.set_color(Colors.GREEN)
+        self.remove_button.set_text(" CANCEL ")
+        self.remove_button.set_color(Colors.GREEN)

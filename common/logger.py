@@ -24,11 +24,11 @@ class Log:
 logger = Log()
 
 
-def log(msg):
+def log(msg: str, e: Exception = None):
     if logger is not None:
-        if isinstance(msg, Exception):
+        if e is not None:
             ex_info = sys.exc_info()
-            logger.log_msg(str(msg))
+            logger.log_msg(msg + str(e))
             traceback.print_exception(*ex_info)
             del ex_info
         else:

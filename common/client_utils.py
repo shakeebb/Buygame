@@ -1,7 +1,7 @@
-import time
 
-from common.game import Game, Player
-from common.gameconstants import ClientMsg, GameStatus, Colors
+from common.game import Game, Player, Tile
+import time
+from common.gameconstants import ClientMsgReq, GameStatus, Colors, ClientResp
 from common.logger import log
 from common.network import Network
 
@@ -19,7 +19,7 @@ class ClientUtils:
     @staticmethod
     def check_game_events(game: Game,
                           number: int,
-                          network: Network,
+                          cur_game_status: GameStatus,
                           notify_srv_msg: default_notification,
                           notify_cln_msg: default_notification):
         # check if we rolled dice yet
@@ -29,129 +29,143 @@ class ClientUtils:
             notify_srv_msg(serverMessage)
 
             # %% racks are handed
-            if "Racks" in serverMessage:
+            if ClientResp.Racks_Ready.msg in serverMessage:
                 return GameStatus.RECEIVE_RACKS
-
-            # players could be done
-            # %%
-            if "Done" in game.getServerMessage():
-                notify_cln_msg(f"round {i} done, time for next round ")
-                # ?? i += 1
-            elif "not ready" in game.getServerMessage():
-                notify_srv_msg(game.getServerMessage())
         # %%
         else:
             # we have not rolled dice
+            # if number == game.leader:
             if number == game.currentPlayer:
                 # it is my turn to roll
-                notify_cln_msg("it is your turn to roll dice")
+                notify_cln_msg("It is your turn to roll dice")
                 return GameStatus.ROLL_DICE
             # %% some one else is playing
             else:
-                # it is someone elses turn to roll
-                i = game.turn
-                notify_cln_msg(f"Player {game.currentPlayer} needs to roll")
+                # it is someone else's turn to roll but don't notify
+                # when already notified once.
+                if cur_game_status != GameStatus.WAIT_TURN:
+                    notify_cln_msg(f"Player {game.leader + 1} needs to roll")
                 return GameStatus.WAIT_TURN
 
         # %% done rolling
 
     @staticmethod
-    def receivedRacks(player: Player, network, number,
+    def rack_to_str(rack: [Tile]):
+        return ",".join(t.letter if t is not None else "" for t in rack)
+
+    @staticmethod
+    def receive_racks(player: Player, network, number,
                       notify_srv_msg: default_notification,
                       notify_cln_msg: default_notification,
                       notify_racks: process_rack):
 
         notify_cln_msg("Your rack contains: ")
-        notify_cln_msg(",".join([t.letter for t in player.get_rack_arr()]))
+        notify_cln_msg(ClientUtils.rack_to_str(player.get_rack_arr()))
         notify_racks(player.get_rack_arr())
 
         notify_cln_msg("New letters: ")
-        notify_cln_msg(",".join([t.letter for t in player.rack.get_temp_arr()]))
+        notify_cln_msg(ClientUtils.rack_to_str(player.rack.get_temp_arr()))
         notify_racks(player.rack.get_temp_arr(), temp=True)
 
         notify_cln_msg("Total value of your draw is: %s" % player.rack.get_temp_value())
-        return GameStatus.BUY
-
-    @staticmethod
-    def buy_tiles(player: Player, network, number,
-                  notify_srv_msg: default_notification,
-                  notify_cln_msg: default_notification):
-        Dice = "Dice: "
-        Bought = "buying racks "
-        Sold = "Sold: "
-        get = "get"
-        Iplayed = "Played"
-        # %% buying
         if player.money >= player.rack.get_temp_value():
             notify_cln_msg("You have:  $%s" % player.money)
-            user_ans = ""
-            while user_ans.upper() != ("Y" or "N"):
-                user_ans = input("Do you want to buy words? (Y-N)").upper()
-                time.sleep(1)
-                notify_cln_msg(f" you entered {user_ans}")
-                if user_ans == "Y":
-                    notify_cln_msg("user wants to buy")
-                    try:
-                        game = network.send(Bought)
-                    except Exception as e:
-                        log(e)
-
-                    while True:
-                        serverMessage = game.getServerMessage()
-                        notify_srv_msg(f"{serverMessage} ")
-                        if "Purchased" in serverMessage:
-                            break
-                        else:
-                            try:
-                                game = network.send(get)
-                            except Exception as e:
-                                continue
-                    player = game.getPlayer(number)
-                    notify_cln_msg("you now have $%s" % player.money)
-                else:
-                    break
         else:
-            notify_cln_msg("You have insufficient funds to purchase tiles")
+            notify_cln_msg("You have insufficient funds to purchase tiles", Colors.RED)
 
+    @staticmethod
+    def buy_tiles(game: Game, network, number,
+                  notify_srv_msg: default_notification,
+                  notify_cln_msg: default_notification) -> (GameStatus, Game):
+        notify_cln_msg("user wants to buy")
+        # try:
+        ret_game: Game = network.send(ClientMsgReq.Buy.msg)
+        assert ret_game is not None
+        game = ret_game
+        # except Exception as e:
+        #     log(e)
+        #     return GameStatus.ERROR, None
+        serverMessage = game.getServerMessage()
+        notify_srv_msg(f"{serverMessage} ")
+        if ClientResp.Bought.msg in serverMessage:
+            player = game.getPlayer(number)
+            notify_cln_msg("you now have $%s" % player.money)
+            return GameStatus.BOUGHT, game
+        else:
+            return GameStatus.BUY_FAILED, game
+
+    @staticmethod
+    def cancel_buy(game: Game, network: Network,
+                   notify_srv_msg: default_notification,
+                   notify_cln_msg: default_notification):
+        ret_game = network.send(ClientMsgReq.Cancel_Buy.msg)
+        assert ret_game is not None and isinstance(ret_game, Game)
+        game = ret_game
+        serverMessage = game.getServerMessage()
+        notify_srv_msg(f"{serverMessage} ")
+        if ClientResp.Buy_Cancelled.msg in serverMessage:
+            notify_cln_msg("Buy cancelled.")
+        else:
+            notify_cln_msg("Buy couldn't be cancelled.")
+
+        return GameStatus.ENABLE_SELL, game
+
+    @staticmethod
+    def sell_word(game: Game, network, number, word_to_sell,
+                  notify_srv_msg: default_notification,
+                  notify_cln_msg: default_notification):
+        selling = ClientMsgReq.Sell.msg
+        ret_status = GameStatus.SELL_FAILED
         # %% selling
-        notify_cln_msg("Your rack contains: ")
-        for tile in player.get_rack_arr():
-            notify_cln_msg(f"{tile.letter}, {tile.score}")
-        sell = input("Do you want to sell any words? Y/N ")
-        if sell.upper() == "Y":
-            attempt = 3
-            while attempt > 0:
-                wordToSell = input("input word to sell: ")
+        # attempt = 3
+        # while attempt > 0:
+            # player.sell(word_to_sell)
 
-                player.sell(wordToSell)
+        # if player.sell_check:
+        try_selling = selling + word_to_sell
+        ret_game = network.send(try_selling)
+        assert ret_game is not None
+        game = ret_game
+        # time.sleep(1)
+        player: Player = game.getPlayer(number)
+        serverMessage = game.getServerMessage()
+        if player.sell_check:
+            notify_srv_msg(f"{serverMessage} ")
+            if ClientResp.Sold.msg in serverMessage:
+                ret_status = GameStatus.SOLD
+            player = game.getPlayer(number)
+            notify_cln_msg("You sold by $%s" % player.wordvalue)
+            # break
+        else:
+            # attempt -= 1
+            notify_cln_msg(
+                f"You failed to sell the word",
+                Colors.RED
+            )
+            ret_status = GameStatus.SELL_FAILED
 
-                if player.sell_check:
-                    Sold += wordToSell
-                    game = network.send(Sold)
-                    time.sleep(1)
-                    # game = n.send(Sold)
-                    # time.sleep(1)
-                    while True:
-                        game = network.send(get)
-                        time.sleep(1)
-                        serverMessage = game.getServerMessage()
-                        notify_srv_msg(f"{serverMessage} ")
-                        if "SOLD" in serverMessage:
-                            break
-                    player = game.getPlayer(number)
+        player: Player = game.getPlayer(number)
+        notify_cln_msg("You now have: $%s" % player.money)
+        # %% done selling
+        return ret_status, game
 
-                    notify_cln_msg("You sold by $%s" % player.wordvalue)
-                    # myPlayer.addPlayerMessage(f" sold {wordToSell}")
-                    break
-                else:
-                    attempt -= 1
-                    notify_cln_msg(
-                        f"You failed to sell the word,{attempt} attempts left",
-                        Colors.RED
-                    )
-            notify_cln_msg("You now have: $%s" % player.money)
-            # %% done selling
-            # sending player object to game
-        game = network.send(Iplayed)
-        return game
+    @staticmethod
+    def i_played(cur_round: int, network: Network):
+        # sending player object to game
+        game = network.send(ClientMsgReq.Played.msg + str(cur_round))
+        return GameStatus.TURN_COMPLETE, game
         # %%
+
+    @staticmethod
+    def round_done(cur_round: int, network: Network,
+                   notify_client: default_notification):
+        game = network.send(ClientMsgReq.Is_Done.msg + str(cur_round))
+        assert isinstance(game, Game)
+        if ClientResp.Done.msg in game.getServerMessage():
+            notify_client(f"round {cur_round} done, time for next round ")
+            cur_round = game.turn
+            return GameStatus.PLAY, cur_round, game
+        elif ClientResp.Not_Ready.msg in game.getServerMessage():
+            notify_client(game.getServerMessage())
+            return GameStatus.WAIT_ALL_PLAYED, cur_round, game
+

@@ -1,37 +1,72 @@
+import itertools
+
 import pygame
 
 from common.logger import log
 from gui.display import Display
-from common.gameconstants import VERBOSE, INIT_TILE_SIZE
+from common.gameconstants import VERBOSE, INIT_TILE_SIZE, Colors
 
 
 class Inventory(Display):
-    def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells, size, rows, cols, color):
+
+    class Slot(pygame.sprite.Sprite):
+        def __init__(self, x, y, width, height, fill_color=Colors.LTR_GRAY):
+            super(Inventory.Slot, self).__init__()
+            self.x = x
+            self.y = y
+            self.width = width
+            self.height = height
+            self.fill_color = fill_color
+            self.rect_dims = (self.x, self.y, self.width, self.height)
+            self._layer = 3
+
+        def draw(self, win):
+            pygame.draw.rect(win, self.fill_color.value, self.rect_dims)
+
+    def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells, size, rows, cols,
+                 border_color=Colors.BLACK, box_color=Colors.LTR_GRAY):
         super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
         if VERBOSE:
-            print("Inv: %s %s W %s" % (h_margin_cells, v_margin_cells, width_cells))
+            log("Inv: %s %s W %s" % (h_margin_cells, v_margin_cells, width_cells))
         self.rows = rows
         self.col = cols
-        from gui.base import Tile
-        self.items: [[Tile]] = [[None for _ in range(self.col)] for _ in range(self.rows)]
         self.box_size = Display.TILE_SIZE * size
         self.border = 3
-        self.color = color
-        self.tilegroup = pygame.sprite.Group()
+        self.border_color = border_color
+        self.box_color = box_color
+        self.tile_group = pygame.sprite.LayeredUpdates()
+        from gui.base import Tile
+        self.items: [[Tile]] = []
+        # self.items: [[Tile]] = [[None for _ in range(cols)] for _ in range(rows)]
+        self.inv_slots: [[Inventory.Slot]] = []
+        for x, y in itertools.product(range(rows), range(cols)):
+            if x >= len(self.inv_slots):
+                self.inv_slots.append([])
+            if x >= len(self.items):
+                self.items.append([])
+
+            self.items[x].append(None)
+            self.inv_slots[x].append(
+                Inventory.Slot(self.x + (self.box_size + self.border) * y + self.border,
+                               self.y + (self.box_size + self.border) * x + self.border,
+                               self.box_size, self.box_size,
+                               self.box_color)
+            )
+        self._layer = 2
         self.refresh_dims()
 
     # draw everything
     def draw(self, win):
         # draw background
 
-        pygame.draw.rect(win, self.color,
+        pygame.draw.rect(win, self.border_color.value,
                          (self.x, self.y, (self.box_size + self.border) * self.col + self.border,
                           (self.box_size + self.border) * self.rows + self.border))
         for x in range(self.rows):
             for y in range(self.col):
-                rect = (self.x + (self.box_size + self.border) * y + self.border,
-                        self.y + (self.box_size + self.border) * x + self.border, self.box_size, self.box_size)
-                pygame.draw.rect(win, (180, 180, 180), rect)
+                # rect = (self.x + (self.box_size + self.border) * y + self.border,
+                #         self.y + (self.box_size + self.border) * x + self.border, self.box_size, self.box_size)
+                # pygame.draw.rect(win, self.box_color.value, rect)
 
                 if self.items[x][y] is not None:
                     from gui.base import Tile
@@ -41,15 +76,22 @@ class Inventory(Display):
                         self.items[x][y].rect.x = pos[0] - (self.items[x][y].rect.width / 2.4)
                         self.items[x][y].rect.y = pos[1] - (self.items[x][y].rect.height / 2.4)
                         __t.init = False
-                        break  # prevents more than one tile at a time
+                        # break  # prevents more than one tile at a time
                     elif __t.init:
-                        __t.update_rect(self.x + ((self.box_size + self.border) * (y + 0.5)),
-                                        rect[1] + INIT_TILE_SIZE)
+                        _s: Inventory.Slot = self.inv_slots[x][y]
+                        __t.update_rect(_s.x, _s.y)
+                    #     # __t.update_rect(self.x + ((self.box_size + self.border) * (y + 0.5)),
+                    #     #                 self.rect[1] + INIT_TILE_SIZE + self.border + 5)
                     elif self.items[x][y].inBox(self):
-                        self.items[x][y].rect.topleft = (self.x + (x * (self.box_size + self.border)), self.y)
-                    # else:
+                        # self.items[x][y].rect.topleft = (self.x + (x * (self.box_size + self.border)), self.y)
+                        _s: Inventory.Slot = self.inv_slots[x][y]
+                        self.items[x][y].rect.topleft = (_s.x, _s.y)
+                # else:
                     #     self.items[x][y] = None
-        self.tilegroup.draw(win)
+                else:
+                    self.inv_slots[x][y].draw(win)
+
+        # self.tile_group.draw(win)
         # self.items[x][y].image = pygame.transform.scale(self.items[x][y].image, (100,100))
 
     # get the square that the mouse is over
@@ -61,26 +103,47 @@ class Inventory(Display):
         x = x // (self.box_size + self.border)
         y = y // (self.box_size + self.border)
 
-        return (int(x), int(y))
+        return int(x), int(y)
 
     # add an item/s
-    def Add(self, Item, xy):
-        x, y = xy
-        # item already there
-        if self.items[x][y] is not None:
-            # if self.items[x][y].letter == Item.letter:
-            #     print("same letter")
-            #     print(Item.letter)
-            # else:
-            #     temp = self.items[x][y]
-            #     self.items[x][y] = Item
-            #
-            #     print("different letters are ")
-            #     return temp
-            log("tile already there")
+    def Add(self, item, xy=None):
+        import gui
+        assert isinstance(item, gui.base.Tile)
+        if xy is None:
+            # find the next available slot
+            for i, j in itertools.product(range(self.rows), range(self.col)):
+                if self.items[i][j] is None:
+                    self.items[i][j] = item
+                    self.tile_group.add(item)
+                    break
         else:
-            self.items[x][y] = Item
-            self.tilegroup.add(Item)
+            x, y = xy
+            # item already there
+            # 'x' is col and 'y' is row
+            if self.items[y][x] is not None:
+                # if self.items[x][y].letter == Item.letter:
+                #     print("same letter")
+                #     print(Item.letter)
+                # else:
+                #     temp = self.items[x][y]
+                #     self.items[x][y] = Item
+                #
+                #     print("different letters are ")
+                #     return temp
+                log("tile already there")
+            else:
+                # 'x' is col and 'y' is row
+                self.items[y][x] = item
+                self.tile_group.add(item)
+
+    def remove_tile(self, item):
+        import gui
+        assert isinstance(item, gui.base.Tile)
+
+        for i, j in itertools.product(range(self.rows), range(self.col)):
+            if self.items[i][j] == item:
+                self.items[i][j] = None
+                self.tile_group.remove(item)
 
     # check whether the mouse in in the grid
     def In_grid(self, x, y):
@@ -127,17 +190,34 @@ class Inventory(Display):
             # print(i)
         return tiles
 
-    def createWord(self):
-        x, y = (0, 0)
+    def get_word(self, row=0) -> str:
+        assert row < len(self.items)
         word = ""
-        for i in range(self.col - 1):
-            x = i
-            if self.items[x][y]:
-                word += self.items[x][y].letter
-        print(word)
+        for t in self.items[row]:
+            word = word + t.letter if t is not None else word
+        # log(word)
+        return word
 
     def refresh_dims(self):
         super().refresh_dims()
         # self.box_size -= (self.col * self.border)
         if VERBOSE:
             print("%s " % self.box_size)
+
+    def clear(self):
+        for i in range(self.rows):
+            for j in range(self.col):
+                self.items[i][j] = None
+        self.tile_group.empty()
+
+    def contains_letter(self, letter: str) -> bool:
+        from gui.base import Tile
+        for r, c in itertools.product(range(self.rows), range(self.col)):
+            item = self.items[r][c]
+            if item is not None:
+                assert isinstance(item, Tile)
+                if item.letter == letter:
+                    return True
+
+        return False
+
