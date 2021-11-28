@@ -185,7 +185,6 @@ class Game:
         self.game_mutex = None
 
     def setReady(self, leaderIndex):
-        log("SB: setting game ready with leader " + str(leaderIndex))
         self.leader = leaderIndex
         self.ready = True
         if self.turn == 0:
@@ -255,7 +254,7 @@ class Game:
                     continue
                 self.currentPlayer = i
                 break
-        log("SB: nextTurn current player is now " + str(self.currentPlayer))
+        log("nextTurn current player is now " + str(self.currentPlayer))
         # n = len(self._players)
         # if self.currentPlayer == n - 1:
         #     self.currentPlayer = 0

@@ -112,7 +112,6 @@ class TopBar(Display):
                 myGame = self.gameui.network.send(ClientMsgReq.Start.msg)
                 if myGame is not None and self.gameui.network.is_connected:
                     self.gameui.set_game(myGame)
-                    log(f"SB: game server status : {myGame.ready}")
                     if self.gameui.game().ready:
                         color = Colors.GREEN
                         _g: Game = self.gameui.game()

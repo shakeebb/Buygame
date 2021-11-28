@@ -108,6 +108,7 @@ class GameStatus(Enum):
     ERROR = auto()
     PLAY = auto()
     ROLL_DICE = auto()
+    PROMPT_DICE_INPUT = auto()
     DICE_ROLL_COMPLETE = auto()
     WAIT_TURN = auto()
     RECEIVE_RACKS = auto()

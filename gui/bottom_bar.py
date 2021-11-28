@@ -3,7 +3,7 @@ import random
 import pygame
 import thorpy
 
-from gui.button import TextButton
+from gui.button import TextButton, RadioButton
 from gui.dice import Dice
 from gui.display import Display
 from common.gameconstants import *
@@ -20,29 +20,40 @@ class BottomBar(Display):
         self.BORDER_THICKNESS = 5
         from gui.base import GameUI
         self.game: GameUI = game
-        button_features = (3.5, 1.5, Colors.DARK_GRAY)
-        self.backtome = TextButton(h_margin_cells + 1,
-                                   v_margin_cells + 1, *button_features, " Return ",
-                                   Colors.ORANGE)
-        controls = [[(" Help ", -9, 1), (" Remove ", -5, 1)],
+        button_features = (5, 1.5, Colors.DARK_GRAY)
+        # self.backtome = TextButton(h_margin_cells + 1,
+        #                            v_margin_cells + 1, *button_features, " Return ",
+        #                            Colors.ORANGE)
+        equal_parts = width_cells // 4
+        button_h_pos = equal_parts * 1.7
+        button_v_pos = self.v_margin_cells - 5
+        controls = [[(" Roll ", -9, 1), (" Cancel ", -5 + 4, 1)],
                     [("Create", -9, 3), (" Chat ", -5, 3)]
                     ]
 
-        self.help_button = TextButton(self.xmargin() + controls[0][0][1],
-                                      self.v_margin_cells + controls[0][0][2],
+        self.help_button = TextButton(self.h_margin_cells + button_h_pos,
+                                      button_v_pos,
                                       *button_features, controls[0][0][0])
 
-        self.remove_button = TextButton(self.xmargin() + controls[0][1][1],
-                                        self.v_margin_cells + controls[0][1][2],
+        self.remove_button = TextButton(self.h_margin_cells + (button_h_pos * 1.4),
+                                        button_v_pos,
                                         *button_features, controls[0][1][0])
 
-        self.createbutton = TextButton(self.xmargin() + controls[1][0][1],
-                                       self.v_margin_cells + controls[1][0][2],
-                                       *button_features, controls[1][0][0])
+        self.option_button = RadioButton(self.h_margin_cells + (button_h_pos * 1.4),
+                                         button_v_pos - 1.5,
+                                         2, 4.3, on_display=False)
+        self.option_button.add_option("2")
+        self.option_button.add_option("3")
+        self.option_button.add_option("4")
+        self.option_button.add_option("5")
 
-        self.chatbutton = TextButton(self.xmargin() + controls[1][1][1],
-                                     self.v_margin_cells + controls[1][1][2],
-                                     *button_features, controls[1][1][0])
+        # self.createbutton = TextButton(self.xmargin() + controls[1][0][1],
+        #                                self.v_margin_cells + controls[1][0][2],
+        #                                *button_features, controls[1][0][0])
+        #
+        # self.chatbutton = TextButton(self.xmargin() + controls[1][1][1],
+        #                              self.v_margin_cells + controls[1][1][2],
+        #                              *button_features, controls[1][1][0])
 
         self.dice: Dice = None
         self.__enable_dice_rolling = False
@@ -52,7 +63,7 @@ class BottomBar(Display):
 
     def refresh_dims(self):
         super().refresh_dims()
-        self.backtome.refresh_dims()
+        # self.backtome.refresh_dims()
 
     def friendly_chat(self):
         pass
@@ -61,17 +72,19 @@ class BottomBar(Display):
         dvals = thorpy.DropDownListLauncher("Choose Dice", titles=[i for i in range(2, 5)])
         dvals.surface = self.game.surface
         dvals.blit()
+        return dvals.get_value()
 
     def all_chat(self):
         pass
 
     def draw(self, win):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
+        self.option_button.draw(win)
         self.help_button.draw(win)
-        self.backtome.draw(win)
+        # self.backtome.draw(win)
         self.remove_button.draw(win)
-        self.createbutton.draw(win)
-        self.chatbutton.draw(win)
+        # self.createbutton.draw(win)
+        # self.chatbutton.draw(win)
         self.dice.draw() if self.dice else None
 
     def button_events(self):
@@ -80,6 +93,14 @@ class BottomBar(Display):
         :return: None
         """
         mouse = pygame.mouse.get_pos()
+        if self.option_button.on_display:
+            self.option_button.click(*mouse)
+            if self.help_button.click(*mouse):
+                self.hide_input_prompt()
+
+            # don't allow click anywhere else
+            return
+
         if self.__enable_dice_rolling and self.help_button.click(*mouse):
             # choices = [("Choose Dice ", self.choose_dice()), ("cancel", None)]
             # thorpy.launch_blocking_choices("Help!\n",
@@ -114,36 +135,54 @@ class BottomBar(Display):
                 self.revert_to_orig()
                 return
 
-        if self.backtome.click(*mouse):
-            self.game.myrack.returntome(self.game.tileList)
+        # if self.backtome.click(*mouse):
+        #     self.game.myrack.returntome(self.game.tileList)
         if self.remove_button.click(*mouse):
             self.game.tileList.empty()
-        if self.createbutton.click(*mouse):
-            self.game.inventory.get_word()
-        if self.chatbutton.click(*mouse):
-            choices = [("All", print("hi")), ("Friendly", print("friend")), ("Cancel", None)]
-            thorpy.launch_blocking_choices("Chat!\n",
-                                           choices)
+        # if self.createbutton.click(*mouse):
+        #     self.game.inventory.get_word()
+        # if self.chatbutton.click(*mouse):
+        #     choices = [("All", print("hi")), ("Friendly", print("friend")), ("Cancel", None)]
+        #     thorpy.launch_blocking_choices("Chat!\n",
+        #                                    choices)
 
     def roll_dice(self):
         if self.dice:
             self.dice.continue_rolling()
             if not self.dice.is_dice_rolling():
-                diceValue = self.dice.get_rolled_dice_no()
+                dice_value = self.dice.get_rolled_dice_no()
                 self.game.top_bar.client_msgs.add_msg("Dice Rolled to: "
-                                                      + str(diceValue))
-                if diceValue not in [2, 3, 4, 5]:
-                    diceValue = self.prompt_input()
-                self.last_rolled_dice_no = diceValue
-                self.__enable_dice_rolling = False
-                self.dice = None
-                self.game.game_status = GameStatus.DICE_ROLL_COMPLETE
-                self.revert_to_orig()
+                                                      + str(dice_value))
+                if dice_value not in [2, 3, 4, 5]:
+                    self.prompt_input()
+                    return
+
+                self.handle_rolled_dice(dice_value)
+
+    def handle_rolled_dice(self, dice_value: int):
+        self.last_rolled_dice_no = dice_value
+        self.__enable_dice_rolling = False
+        self.dice = None
+        self.game.game_status = GameStatus.DICE_ROLL_COMPLETE
+        self.revert_to_orig()
 
     def prompt_input(self):
         self.game.top_bar.client_msgs.add_msg("Your Choice. Enter between 2 to 5")
+        self.help_button.set_text(" Choose ")
+        self.remove_button.hide()
+        self.option_button.show()
+        self.game.game_status = GameStatus.PROMPT_DICE_INPUT
         # enable input field & validate
-        return random.randint(2, 5)
+        # return random.randint(2, 5)
+
+    def hide_input_prompt(self):
+        user_chosen_dice_value = self.option_button.get_chosen_option_value() + 2
+        self.game.top_bar.client_msgs.add_msg("User chose dice value: "
+                                              + str(user_chosen_dice_value), Colors.RED)
+        self.handle_rolled_dice(user_chosen_dice_value)
+        self.help_button.set_text(" Help ")
+        self.remove_button.show()
+        self.option_button.hide()
 
     def enable_dice_rolling(self):
         self.last_rolled_dice_no = -2

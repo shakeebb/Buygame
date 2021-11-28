@@ -60,9 +60,9 @@ class GameUI:
 
         self.myrack = Inventory(self.bottom_bar.h_margin_cells + 5,
                                 self.bottom_bar.v_margin_cells + 1,
-                                self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 10, Colors.ORANGE)
+                                self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 13, Colors.ORANGE)
 
-        self.extrarack = Inventory(self.bottom_bar.h_margin_cells + 10,
+        self.extrarack = Inventory(self.bottom_bar.h_margin_cells + 15,
                                    self.bottom_bar.v_margin_cells + 5,
                                    self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 5, Colors.RED)
 
@@ -171,12 +171,12 @@ class GameUI:
     def heartbeat(self):
         while not self.hb_event.is_set():
             if self.game_status == GameStatus.WAIT_TURN:
-                log("SB: fetching the game object")
                 ret_game = self.network.send(ClientMsgReq.Get.msg)
+                if ret_game is None:
+                    continue
                 assert isinstance(ret_game, Game)
                 self.set_game(ret_game)
             elif self.game_status == GameStatus.WAIT_ALL_PLAYED:
-                self.top_bar.client_msgs.add_msg("SB: fetching game object while waiting for all played")
                 self.check_round_complete()
             else:
                 self.network.heartbeat()
@@ -405,6 +405,7 @@ class GameUI:
             player = self.game().getPlayer(self.my_player_number)
             self.myrack.clear()
             self.temp_rack.clear()
+            self.extrarack.clear()
 
             def process_rack(rack: [common.game.Tile], temp=False):
                 for rT in rack:
