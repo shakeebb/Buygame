@@ -68,10 +68,10 @@ class Network:
         log("creating client socket")
         self.client: socket = self.create_client_socket()
         self.is_connected = False
-        self.server = "localhost"
-        self.port = 1234
-        # self.server = "3.16.22.25"
-        # self.port = 58092
+        # self.server = "localhost"
+        # self.port = 1234
+        self.server = "3.19.221.168"
+        self.port = 58092
         self.addr = (self.server, self.port)
         self.con_mutex = RLock()
         self.p = int(self.connect())

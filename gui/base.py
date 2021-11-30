@@ -317,7 +317,7 @@ class GameUI:
                     self.set_game(self.network.send(diceMessage))
                     self.game_status = GameStatus.PLAY
                 except Exception as e:
-                    log("dice roll noitfy failed", e)
+                    log("dice roll notify failed", e)
 
             if self.game_status == GameStatus.ENABLE_BUY:
                 self.bottom_bar.enable_buy()

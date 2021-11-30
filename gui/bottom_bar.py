@@ -148,16 +148,17 @@ class BottomBar(Display):
 
     def roll_dice(self):
         if self.dice:
-            self.dice.continue_rolling()
-            if not self.dice.is_dice_rolling():
-                dice_value = self.dice.get_rolled_dice_no()
-                self.game.top_bar.client_msgs.add_msg("Dice Rolled to: "
-                                                      + str(dice_value))
-                if dice_value not in [2, 3, 4, 5]:
-                    self.prompt_input()
-                    return
+            if self.dice.continue_rolling():
+                return
+            dice_value = self.dice.get_rolled_dice_no()
+            msg = "Dice Rolled to: " + str(dice_value)
+            self.game.top_bar.client_msgs.add_msg(msg)
+            self.game.chat.update_chat(msg)
+            if dice_value in [1, 6]:
+                self.prompt_input()
+                return
 
-                self.handle_rolled_dice(dice_value)
+            self.handle_rolled_dice(dice_value)
 
     def handle_rolled_dice(self, dice_value: int):
         self.last_rolled_dice_no = dice_value
@@ -177,8 +178,9 @@ class BottomBar(Display):
 
     def hide_input_prompt(self):
         user_chosen_dice_value = self.option_button.get_chosen_option_value() + 2
-        self.game.top_bar.client_msgs.add_msg("User chose dice value: "
-                                              + str(user_chosen_dice_value), Colors.RED)
+        msg = "Chosen dice value: " + str(user_chosen_dice_value)
+        self.game.top_bar.client_msgs.add_msg(msg, Colors.RED)
+        self.game.chat.update_chat(msg)
         self.handle_rolled_dice(user_chosen_dice_value)
         self.help_button.set_text(" Help ")
         self.remove_button.show()

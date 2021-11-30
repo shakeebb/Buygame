@@ -7,6 +7,7 @@ import random
 import pygame
 
 from common.gameconstants import *
+from common.logger import log
 
 
 class Dice:
@@ -36,17 +37,21 @@ class Dice:
         self.right = self.bottom = self.size - self.left
 
         # init member vars
+        self.dice_rolled = False
         self.rolled_no = 0
         self.roll_number_of_iters = 0
         self.d: pygame.Rect = None
 
     def draw(self):
-        self.d = pygame.draw.rect(self.game.surface, (255, 255, 255),
+        self.d = pygame.draw.rect(self.game.surface, Colors.WHITE.value,
                                   (self.x, self.y, self.size, self.size))
+        self.d = pygame.draw.rect(self.game.surface, Colors.BLACK.value,
+                                  (self.x, self.y, self.size, self.size), 1)
         if self.rolled_no > 0:
             self.__spotify_dice(self.rolled_no)
 
     def clear(self):
+        self.dice_rolled = False
         self.rolled_no = 0
         self.roll_number_of_iters = 0
 
@@ -67,20 +72,29 @@ class Dice:
             self.__draw_spot(self.right, self.mid)
 
     def continue_rolling(self):
-        print("Rolling for " + str(self.roll_number_of_iters)) if VERBOSE else None
-        self.rolled_no = self.rand.randint(1, 6)
+        if self.is_dice_rolling():
+            self.rolled_no = self.rand.randint(1, 6)
+            log("Rolling for " + str(self.roll_number_of_iters) + " rolled to " + str(self.rolled_no)) \
+                if VERBOSE else None
+            self.dice_rolled = False
+        else:
+            self.dice_rolled = True
+
         self.draw()
-        self.__spotify_dice(self.rolled_no)
         self.roll_number_of_iters -= 1
         if not self.is_dice_rolling():
+            log(f"Cancelling the timer... {self.dice_rolled}") if VERBOSE else None
             pygame.time.set_timer(self.ROLL_DICE_EVENT, 0)  # disable timer
+            # just put one extra event, to handle post dice_rolled.
+            pygame.event.post(self.ROLL_DICE_EVENT) if not self.dice_rolled else None
+        return not self.dice_rolled
 
     def roll(self, num_iter):
         if self.is_dice_rolling():
             return
         self.roll_number_of_iters = num_iter
         pygame.time.set_timer(self.ROLL_DICE_EVENT, 200)  # every 100ms
-        self.game.chat.update_chat("Dice rolling")
+        # self.game.chat.update_chat("Dice rolling")
 
     def is_dice_rolling(self):
         return self.roll_number_of_iters > 0
