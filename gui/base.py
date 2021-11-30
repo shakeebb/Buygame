@@ -203,8 +203,6 @@ class GameUI:
         logger.reset()
         try:
             self.network = network.Network()
-            self.hb_thread.start()
-
             log("we connected to network - player no " + str(self.network.p))
             self.my_player_number = self.network.p
             self.network.send(ClientMsgReq.Name.msg + self.player_name)
@@ -222,6 +220,8 @@ class GameUI:
 
         pygame.event.clear()
         selected = None
+        self.hb_thread.start()
+
         while True:  # main game loop
             letter = chr(random.randint(65, 90))
             mouseClicked = False

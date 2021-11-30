@@ -315,7 +315,7 @@ class Rack:
         return ", ".join(str(item.get_letter() if item is not None else "-") for item in self.rack)
 
     def get_rack_list(self):
-        return [str(item.get_letter()) for item in self.rack]
+        return [str(item.get_letter()) if item is not None else "" for item in self.rack]
 
     def get_rack_arr(self):
         # Returns the rack as an array of tile instances

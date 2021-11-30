@@ -61,7 +61,7 @@ def receive_pickle(client_socket):
             return False
         # print("first", message_header)
         message_length = int(message_header.decode('utf-8').strip())
-        message = client_socket.recv(message_length)
+        message = client_socket.recv(message_length, socket.MSG_WAITALL)
         # print("message", message)
         unpickled = pickle.loads(message)
         # print("unpickled", unpickled)

@@ -40,7 +40,7 @@ def receive_pickle(client_socket):
             return False
         # print("first", message_header)
         message_length = int(message_header.decode('utf-8').strip())
-        message = client_socket.recv(message_length)
+        message = client_socket.recv(message_length, socket.MSG_WAITALL)
         # print("message", message)
         unpickled = pickle.loads(message)
         # print("unpickled", unpickled)
@@ -52,12 +52,12 @@ def receive_pickle(client_socket):
 
 def receive_message(client_socket):
     try:
-        message_header = client_socket.recv(MSG_HEADER_LENGTH)
+        message_header = client_socket.recv(MSG_HEADER_LENGTH, socket.MSG_WAITALL)
         if not len(message_header):
             return False
 
         message_length = int(message_header.decode('utf-8').strip())
-        return client_socket.recv(message_length).decode('utf-8')
+        return client_socket.recv(message_length, socket.MSG_WAITALL).decode('utf-8')
     except Exception as e:
         log("receive message failed with", e)
         return False
@@ -70,6 +70,8 @@ class Network:
         self.is_connected = False
         self.server = "localhost"
         self.port = 1234
+        # self.server = "3.16.22.25"
+        # self.port = 58092
         self.addr = (self.server, self.port)
         self.con_mutex = RLock()
         self.p = int(self.connect())
@@ -105,7 +107,7 @@ class Network:
                     return
                 if VERBOSE:
                     log("HB sending")
-                self.client.send(createMessage(ClientMsgReq.HeartBeat.msg))
+                self.client.sendall(createMessage(ClientMsgReq.HeartBeat.msg))
                 resp = receive_message(self.client)
                 if VERBOSE:
                     log("HB received " + str(resp))
