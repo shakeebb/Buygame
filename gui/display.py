@@ -30,7 +30,7 @@ class Display(pygame.sprite.Sprite):
             self.HEIGHT = 1080
             dis_info = pygame.display.Info()  # You have to call this before pygame.display.set_mode()
             self.monitor_size = (dis_info.current_w, dis_info.current_h)
-            self.window = pygame.display.set_mode((self.monitor_size[0] * 0.96, self.monitor_size[1] * 0.89),
+            self.window = pygame.display.set_mode((int(self.monitor_size[0] * 0.96), int(self.monitor_size[1] * 0.89)),
                                                   SURFACE_FLAGS)
             self.win_w = self.window.get_width()
             self.win_h = self.window.get_height()

@@ -497,7 +497,7 @@ class Tile(pygame.sprite.Sprite):
         self.original = self.image
         # self.image = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
         # self.size = self.image.get_size()
-        self.image = pygame.transform.scale(self.image, (box_size, box_size))
+        self.image = pygame.transform.scale(self.image, (int(box_size), int(box_size)))
         self.size = self.image.get_size()
         self.box_size = box_size
         self.clicked = False

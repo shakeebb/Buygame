@@ -70,7 +70,7 @@ class Network:
         self.is_connected = False
         # self.server = "localhost"
         # self.port = 1234
-        self.server = "3.19.221.168"
+        self.server = "18.219.32.107"
         self.port = 58092
         self.addr = (self.server, self.port)
         self.con_mutex = RLock()
