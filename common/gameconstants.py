@@ -13,7 +13,7 @@ DISPLAY_TILE_GRID_OUTPUT = False
 HEARTBEAT_INTERVAL_SECS = 10.0
 WAIT_POLL_INTERVAL = 2.0
 MSG_HEADER_LENGTH = 2048
-SERIALIZE_HEADER_LENGTH = 4096
+SERIALIZE_HEADER_LENGTH = 4
 MAX_RECONNECT_TIME = 16
 WILD_CARD = "*"
 
@@ -42,6 +42,8 @@ class Colors(Enum):
     ORANGE = (255, 128, 0)
     PURPLE = (255, 0, 255)
     CYAN = (0, 255, 255)
+    MAGENTA = (144, 0, 144)
+    DIRTY_YELLOW = (240, 170, 0)
 
     def __init__(self, r, g, b):
         self.R = r
@@ -113,11 +115,13 @@ class GameStatus(Enum):
     WAIT_TURN = auto()
     RECEIVE_RACKS = auto()
     ENABLE_BUY = auto()
+    BUY_ENABLED = auto()
     BUY = auto()
     CANCEL_BUY = auto()
     BOUGHT = auto()
     BUY_FAILED = auto()
     ENABLE_SELL = auto()
+    SELL_ENABLED = auto()
     SELL = auto()
     CANCEL_SELL = auto()
     SOLD = auto()

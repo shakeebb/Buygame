@@ -109,7 +109,7 @@ class Server:
                 client_socket.setblocking(True)
                 # adding client socket to list of users
                 log(f"[CONNECTION] {client_address} connected!")
-                cs = ClientSocket(client_socket, len(self.client_sockets_list))
+                cs = ClientSocket(client_socket, self.gameId, len(self.client_sockets_list))
                 self.client_sockets_list.append(cs)
                 if self.number_of_usr == 0:
                     log("Creating a new game....")
@@ -132,7 +132,7 @@ class Server:
                 # sending game to player
                 # start_new_thread(self.threaded, (cs, self.gameId))
                 ct = threading.Thread(target=self.threaded, args=(cs, self.gameId),
-                                      name="client-" + str(self.number_of_usr),
+                                      name=cs.thread_name,
                                       daemon=False)
                 ct.start()
                 self.threads_list.append(ct)
@@ -172,24 +172,30 @@ class Server:
                 # %%
                 break
 
-        current_game = self.games[_game_id]
-        players_map = dict(current_game.get_players_map())
-        if players_map.pop(decodedP):
-            log(f"Removed {decodedP} from game's player_map")
+        # current_game: Game = self.games[_game_id]
+        # players_map = dict(current_game.get_players_map())
+        # removed_player: Player = players_map.pop(decodedP)
+        # if removed_player:
+        #     log(f"Removed {decodedP} from game's player_map")
+        #
+        # if decodedP == current_game.currentPlayer:
+        #     log(f"closing current player {stringp} connection.")
+        #     if len(players_map) > 0:
+        #         _p: Player = random.choice(current_game.getPlayers())
+        #         current_game.setPlayer(_p.number)
+        #         current_game.setReady(_p.number)
+        #         self.games[_game_id] = current_game
+        # else:
+        #     log(f"closing client {stringp} connection.")
 
-        if decodedP == current_game.currentPlayer:
-            log(f"closing current player {stringp} connection.")
-            if len(players_map) > 0:
-                _p: Player = random.choice(current_game.getPlayers())
-                current_game.setPlayer(_p.number)
-                current_game.setReady(_p.number)
-                self.games[_game_id] = current_game
-        else:
-            log(f"closing client {stringp} connection.")
-
+        log(f"closing client {stringp} connection.")
         self.number_of_usr -= 1
         # connection closed
         _cs.socket.close()
+        for i in range(len(self.threads_list)):
+            if self.threads_list[i].name == _cs.thread_name:
+                self.threads_list.pop(i)
+                break
 
     def cleanup_thread(self):
         while not self.cleanup_interval.is_set():

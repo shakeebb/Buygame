@@ -371,13 +371,17 @@ class Bag:
         # which adds the default 100 tiles to the bag.
         # Takes no arguments.
         self.bag = []
+        self.wildcard_bag = []
         self.initialize_bag(game_tiles)
 
     def add_to_bag(self, tile, quantity):
         # Adds a certain quantity of a certain tile to the bag.
         # Takes a tile and an integer quantity as arguments.
         for i in range(quantity):
-            self.bag.append(tile)
+            if tile.letter == WILD_CARD:
+                self.wildcard_bag.append(tile)
+            else:
+                self.bag.append(tile)
 
     def initialize_bag(self, game_tiles):
         # Adds the intiial 108 tiles to the bag.
@@ -393,16 +397,17 @@ class Bag:
         return self.bag.pop()
 
     def return_to_bag(self, tile):
-        self.bag.append(tile)
+        if tile.letter == WILD_CARD:
+            self.wildcard_bag.append(tile)
+        else:
+            self.bag.append(tile)
 
     def get_remaining_tiles(self):
         # Returns the number of tiles left in the bag.
         return len(self.bag)
 
     def take_wild_bag(self):
-        for i in range(len(self.bag)):
-            if self.bag[i].letter == WILD_CARD:
-                return self.bag.pop(i)
+        return self.wildcard_bag.pop()
 
 
 class Tile:

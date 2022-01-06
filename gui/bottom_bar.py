@@ -153,7 +153,6 @@ class BottomBar(Display):
             dice_value = self.dice.get_rolled_dice_no()
             msg = "Dice Rolled to: " + str(dice_value)
             self.game.top_bar.client_msgs.add_msg(msg)
-            self.game.chat.update_chat(msg)
             if dice_value in [1, 6]:
                 self.prompt_input()
                 return
@@ -180,7 +179,6 @@ class BottomBar(Display):
         user_chosen_dice_value = self.option_button.get_chosen_option_value() + 2
         msg = "Chosen dice value: " + str(user_chosen_dice_value)
         self.game.top_bar.client_msgs.add_msg(msg, Colors.RED)
-        self.game.chat.update_chat(msg)
         self.handle_rolled_dice(user_chosen_dice_value)
         self.help_button.set_text(" Help ")
         self.remove_button.show()

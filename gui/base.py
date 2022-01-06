@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from threading import Thread, Event
 
 import pygame
@@ -15,6 +16,7 @@ from common import network
 from common.game import *
 from common.logger import log, Log, logger
 from gui.display import Display
+from gui.label import MessageList
 from gui.leaderboard import Leaderboard
 from gui.snap import Inventory
 from gui.top_bar import TopBar
@@ -29,19 +31,23 @@ class GameUI:
 
         self.top_bar = TopBar(0.5, 0.5, Display.num_horiz_cells() - 1, 4)
         self.leaderboard = Leaderboard(0.5, self.top_bar.ymargin() + 1, 5, 10)
-        self.chat = Chat(Display.num_horiz_cells() - 10, self.top_bar.ymargin() + 0.5,
-                         10, Display.num_vert_cells() - 6,
-                         self)
+        self.message_box = MessageList(Display.num_horiz_cells() - 10,
+                                       self.top_bar.ymargin() + 0.5,
+                                       10, 10,
+                                       num_msgs=10, line_spacing=30, font_sz=18, bold_face=False,
+                                       border_width=4, border_color=Colors.MAGENTA)
         # self.board = Board(305,125)
         self.temp_rack = Inventory(self.leaderboard.xmargin() + 11,
                                    self.top_bar.ymargin() + 1,
-                                   self.chat.h_margin_cells - 2,
-                                   2, 2.5, 1, 5, Colors.LT_GRAY, Colors.WHITE)
+                                   self.message_box.h_margin_cells - 2,
+                                   2, 2.5, 1, 5, display_dollar_value=True,
+                                   border_color=Colors.LT_GRAY, box_color=Colors.WHITE)
 
         self.inventory = Inventory(self.leaderboard.xmargin() + 5,
                                    self.top_bar.ymargin() + 5,
-                                   self.chat.h_margin_cells - 2,
-                                   2, 2.5, 1, 10, Colors.GRAY)
+                                   self.message_box.h_margin_cells - 2,
+                                   2, 2.5, 1, 10, display_dollar_value=True,
+                                   border_color=Colors.GRAY)
         # self.inventory = Inventory((self.chat.h_margin_cells - self.leaderboard.xmargin()) / 2,
         #                            self.top_bar.ymargin() + 4,
         #                            24, 2.5, 75, 1, 10, Colors.GRAY.value)
@@ -54,17 +60,22 @@ class GameUI:
         # self.backgroundTiles = pygame.sprite.Group()
         # self.helpbox = thorpy.Box(elements=[thorpy.Element("Hello")])
         self.bottom_bar = BottomBar(0.5, self.bag.ymargin() + 1,
-                                    self.chat.h_margin_cells - 1,
-                                    self.chat.ymargin() - self.bag.ymargin() - 1,
+                                    Display.num_horiz_cells() - 11,
+                                    Display.num_vert_cells() - self.bag.ymargin() - 1,
+                                    # self.chat.ymargin() - self.bag.ymargin() - 1,
                                     self)
+
+        self.chat = Chat(self.message_box.h_margin_cells, self.bottom_bar.v_margin_cells,
+                         10, Display.num_vert_cells() - self.bottom_bar.v_margin_cells - 0.5,
+                         self)
 
         self.myrack = Inventory(self.bottom_bar.h_margin_cells + 5,
                                 self.bottom_bar.v_margin_cells + 1,
-                                self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 13, Colors.ORANGE)
+                                self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 13, border_color=Colors.GRAY)
 
         self.extrarack = Inventory(self.bottom_bar.h_margin_cells + 15,
                                    self.bottom_bar.v_margin_cells + 5,
-                                   self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 5, Colors.RED)
+                                   self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 5, border_color=Colors.GRAY)
 
         self.top_bar.change_round(1)
         self.tileList = pygame.sprite.Group()
@@ -88,7 +99,7 @@ class GameUI:
         self.leaderboard.draw(self.surface)
         self.top_bar.draw(self.surface)
         # self.middle_bar.draw(self.win)
-        self.chat.draw(self.surface)
+        self.message_box.draw(self.surface)
         # for tile in self.tileList:
         #     tile.inBox(self.inventory)
         #     if tile.inabox:
@@ -102,6 +113,7 @@ class GameUI:
         # self.bag.draw(self.surface)
         self.bag.drawMe()
         self.bottom_bar.draw(self.surface)
+        self.chat.draw(self.surface)
 
         self.temp_rack.draw(self.surface)
         self.inventory.draw(self.surface)
@@ -184,29 +196,16 @@ class GameUI:
 
     def main(self):
         pygame.display.set_caption('beta version BuyGame')
-        # self.box = thorpy.Box(elements=[slider,button1])
-        #
-        # #we regroup all elements on a menu, even if we do not launch the menu
-        # menu = thorpy.Menu(self.box)
-        # #important : set the screen as surface for all elements
-        # for element in menu.get_population():
-        #     element.surface = self.win
-        # self.box.set_topleft((100,100))
-
-        # self.bag.add(Bag(w * 0.05, h * 0.72))
-        FPSCLOCK = pygame.time.Clock()
-        # screen = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-        mousex = 0  # used to store x coordinate of mouse event
-        mousey = 0  # used to store y coordinate of mouse event
-        # letter = 'C'
-        FONT = pygame.font.SysFont('comicsans', 100)
         logger.reset()
         try:
             self.network = network.Network()
             log("we connected to network - player no " + str(self.network.p))
             self.my_player_number = self.network.p
-            self.network.send(ClientMsgReq.Name.msg + self.player_name)
-            ret = self.network.send(ClientMsgReq.Get.msg)
+            ret = self.network.send(ClientMsgReq.Name.msg + self.player_name)
+            if ret is None:
+                time.sleep(1)
+                ret = self.network.send(ClientMsgReq.Get.msg)
+
             if ret is not None:
                 self.set_game(ret)
                 self.leaderboard.players = self.game().getPlayers()
@@ -301,7 +300,7 @@ class GameUI:
                                                                  self.my_player_number,
                                                                  self.game_status,
                                                                  self.server_notify,
-                                                                 self.client_notify)
+                                                                 self.messagebox_notify)
 
             if self.game_status == GameStatus.RECEIVE_RACKS:
                 self.refresh_inventory()
@@ -321,16 +320,20 @@ class GameUI:
 
             if self.game_status == GameStatus.ENABLE_BUY:
                 self.bottom_bar.enable_buy()
+                self.game_status = GameStatus.BUY_ENABLED
 
             if self.game_status == GameStatus.ENABLE_SELL:
                 self.bottom_bar.enable_sell()
+                self.messagebox_notify("Create a word to sell")
+                self.game_status = GameStatus.SELL_ENABLED
 
             if self.game_status == GameStatus.BUY:
                 try:
                     (self.game_status, _g_obj) = ClientUtils.buy_tiles(self.game(), self.network,
                                                                        self.my_player_number,
                                                                        self.server_notify,
-                                                                       self.client_notify)
+                                                                       self.client_notify,
+                                                                       self.messagebox_notify)
                     self.set_game(_g_obj)
                     self.refresh_inventory()
                     # bought_tiles = {}
@@ -357,13 +360,18 @@ class GameUI:
                 self.refresh_inventory()
 
             if self.game_status == GameStatus.SELL:
+                if len(self.top_bar.word) == 0:
+                    self.messagebox_notify("Cannot sell a blank word", Colors.RED)
+                    self.game_status = GameStatus.ENABLE_SELL
+                    continue
                 try:
                     player: Player = self.game().getPlayer(self.my_player_number)
                     (self.game_status, _g_obj) = ClientUtils.sell_word(self.game(), self.network,
                                                                        self.my_player_number,
                                                                        self.top_bar.word,
                                                                        self.server_notify,
-                                                                       self.client_notify)
+                                                                       self.client_notify,
+                                                                       self.messagebox_notify)
                     self.set_game(_g_obj)
                     self.inventory.clear()
                     self.refresh_inventory()
@@ -419,7 +427,7 @@ class GameUI:
                     inv = self.temp_rack if temp else self.myrack
                     import gui
                     _tile = gui.base.Tile(inv.x, inv.y, self.tileID, self.sprite_tiles, rT.letter,
-                                          inv.box_size, 1)
+                                          inv.box_size, rT.score)
                     if rT.letter == WILD_CARD:
                         self.extrarack.Add(_tile)
                     else:
@@ -428,10 +436,12 @@ class GameUI:
 
             # %% end of process_rack
 
-            ClientUtils.receive_racks(player, self.network, self.my_player_number,
+            ClientUtils.receive_racks(player, self.game_status, self.my_player_number,
                                       self.server_notify,
                                       self.client_notify,
+                                      self.messagebox_notify,
                                       process_rack)
+
         except Exception as e:
             log("refresh inventory failed", e)
 
@@ -441,9 +451,13 @@ class GameUI:
     def client_notify(self, msg: str, color: Colors = Colors.BLACK):
         self.top_bar.client_msgs.add_msg(msg, color)
 
+    def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK):
+        self.message_box.add_msg(msg, color)
+
     def check_round_complete(self):
         (self.game_status, r, _g_obj) = ClientUtils.round_done(self.top_bar.round, self.network,
-                                                               self.client_notify)
+                                                               self.client_notify,
+                                                               self.messagebox_notify)
         self.set_game(_g_obj)
         self.top_bar.change_round(r)
 

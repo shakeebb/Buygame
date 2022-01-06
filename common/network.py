@@ -35,19 +35,41 @@ def createPickle(aPickle):
 
 def receive_pickle(client_socket):
     try:
-        message_header = client_socket.recv(SERIALIZE_HEADER_LENGTH)
-        if not len(message_header):
-            return False
-        # print("first", message_header)
-        message_length = int(message_header.decode('utf-8').strip())
-        message = client_socket.recv(message_length, socket.MSG_WAITALL)
-        # print("message", message)
+        message_length = 0
+        while message_length == 0:
+            message_header = client_socket.recv(SERIALIZE_HEADER_LENGTH)
+            if not len(message_header):
+                return False
+            # print("first", message_header)
+            mh_b = message_header.decode('utf-8', 'ignore').strip()
+            message_length = int(mh_b)
+            # print("message_header_bytes ", mh_b, " message_length ", message_length)
+
+        # print("message_length", message_length)
+        message = b''
+        while len(message) != message_length:
+            message = recvall(client_socket, message_length)
+        # print(f"len(message) {len(message)} -- message {message}")
         unpickled = pickle.loads(message)
         # print("unpickled", unpickled)
         return unpickled
     except Exception as e:
-        log("deserialization failed", e)
+        log("deserialization failed: ", e)
         return False
+
+
+def recvall(sock, size):
+    received_chunks = []
+    buf_size = 4096
+    remaining = size
+    while remaining > 0:
+        received = sock.recv(min(remaining, buf_size), socket.MSG_WAITALL)
+        # print(f"len(received) {len(received)} remaining {remaining}")
+        if not received:
+            raise Exception('unexpected EOF')
+        received_chunks.append(received)
+        remaining -= len(received)
+    return b''.join(received_chunks)
 
 
 def receive_message(client_socket):
@@ -56,7 +78,7 @@ def receive_message(client_socket):
         if not len(message_header):
             return False
 
-        message_length = int(message_header.decode('utf-8').strip())
+        message_length = int(message_header.decode('utf-8', 'ignore').strip())
         return client_socket.recv(message_length, socket.MSG_WAITALL).decode('utf-8')
     except Exception as e:
         log("receive message failed with", e)
@@ -68,10 +90,10 @@ class Network:
         log("creating client socket")
         self.client: socket = self.create_client_socket()
         self.is_connected = False
-        # self.server = "localhost"
+        self.server = "localhost"
         # self.port = 1234
-        self.server = "18.219.32.107"
-        self.port = 58092
+        # self.server = "23.239.14.203"
+        self.port = 1234
         self.addr = (self.server, self.port)
         self.con_mutex = RLock()
         self.p = int(self.connect())
@@ -137,7 +159,7 @@ class Network:
                 log("time to connect")
                 self.client.connect(self.addr)
                 log("connected successful")
-                time.sleep(1)
+                time.sleep(0.001)
                 myP = receive_message(self.client)
                 myNumber = int(myP)
                 self.is_connected = True
@@ -148,7 +170,7 @@ class Network:
                 raise e
 
     def send(self, data: str) -> object:
-        sleepTime = 1
+        sleepTime = 0.01
         while True:
             if not self.is_connected:
                 log("Automatically Reconnecting")
@@ -160,9 +182,9 @@ class Network:
                     self.client.send(createMessage(data))
                     self.is_connected = True
                     # print(f"{data} sent")
-                    time.sleep(1)
+                    time.sleep(0.01)
                     data = receive_pickle(self.client)
-                    time.sleep(1)
+                    # time.sleep(1)
                     if bool(data) is not False:
                         # print(f"[game] {data}")
                         return data

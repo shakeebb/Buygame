@@ -52,11 +52,15 @@ class MessageList(Display):
 
     def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells,
                  num_msgs: int,
-                 font_sz: int = 12, border_color: Colors = Colors.BLACK):
+                 line_spacing: int = 15,
+                 font_sz: int = 12, bold_face: bool = False,
+                 border_width: int = 1, border_color: Colors = Colors.BLACK):
         super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
         self.list = collections.deque(maxlen=num_msgs)
-        self.font = pygame.font.SysFont("timesnewroman", font_sz)
+        self.line_spacing = line_spacing
+        self.font = pygame.font.SysFont("comicsans", font_sz, bold=bold_face)
         self.border_color = border_color
+        self.border_width = border_width
         self.refresh_dims()
 
     def add_msg(self, msg: str, color: Colors = Colors.BLACK):
@@ -64,8 +68,8 @@ class MessageList(Display):
         self.list.append(s)
 
     def draw(self, win):
-        pygame.draw.rect(win, Colors.BLACK.value,
-                         (self.x, self.y, self.width, self.height), 1,
+        pygame.draw.rect(win, self.border_color.value,
+                         (self.x, self.y, self.width, self.height), self.border_width,
                          2, 2, 2, 2, 2)
         for i, m in enumerate(self.list):
-            win.blit(m, (self.x + 10, self.y + i * 15))
+            win.blit(m, (self.x + 10, self.y + (i * self.line_spacing)))

@@ -27,7 +27,7 @@ class Chat(Display):
         # self.HEIGHT = (h - self.y_margin - h_tm - h_bm)
         # self.x = (w - (w * 0.02)) - self.WIDTH + self.x_margin
         # self.y = self.y_margin + h_tm
-        self.txt_sz = self.height * 0.04
+        self.txt_sz = self.height * 0.1
         if VERBOSE:
             print("Chat ht = %s, y = %s , y_margin = %s " % (self.height, self.y, self.y_margin))
 
@@ -43,11 +43,12 @@ class Chat(Display):
             self.typing = ""
 
     def draw(self, win):
-        pygame.draw.rect(win, (0, 0, 0), pygame.Rect(self.x, self.y, self.width, self.height), 2)
+        pygame.draw.rect(win, Colors.DIRTY_YELLOW.value,
+                         pygame.Rect(self.x, self.y, self.width, self.height), 4)
         # pygame.draw.line(win, (0, 0, 0), (self.x, self.y - 40),
         #                  (self.x + self.WIDTH, self.y + 40), self.BORDER_THICKNESS)
-        pygame.draw.rect(win, Colors.LT_GRAY.value, pygame.Rect(self.x, self.y + self.height - self.txt_sz,
-                                                                self.width, self.txt_sz))
+        pygame.draw.rect(win, Colors.LT_GRAY.value, pygame.Rect(self.x + 4, self.y + self.height - self.txt_sz - 1,
+                                                                self.width - 5, self.txt_sz - 1))
 
         while len(self.content) * self.CHAT_GAP > self.height - self.txt_sz - 20:
             self.content = self.content[:-1]

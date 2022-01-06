@@ -24,6 +24,7 @@ class Inventory(Display):
             pygame.draw.rect(win, self.fill_color.value, self.rect_dims)
 
     def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells, size, rows, cols,
+                 display_dollar_value: bool = False,
                  border_color=Colors.BLACK, box_color=Colors.LTR_GRAY):
         super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
         if VERBOSE:
@@ -52,6 +53,10 @@ class Inventory(Display):
                                self.box_size, self.box_size,
                                self.box_color)
             )
+        self.dv_font = pygame.font.SysFont("comicsans", 50)
+        self.display_dollar_value = display_dollar_value
+        self.dollar_value_txt = self.dv_font.render(f"", 1, (0, 0, 0))
+
         self._layer = 2
         self.refresh_dims()
 
@@ -90,6 +95,10 @@ class Inventory(Display):
                     #     self.items[x][y] = None
                 else:
                     self.inv_slots[x][y].draw(win)
+
+        win.blit(self.dollar_value_txt,
+                 (self.x + (self.col * (self.box_size + self.border)) + self.border + 10,
+                  self.y))
 
         # self.tile_group.draw(win)
         # self.items[x][y].image = pygame.transform.scale(self.items[x][y].image, (100,100))
@@ -135,6 +144,7 @@ class Inventory(Display):
                 # 'x' is col and 'y' is row
                 self.items[y][x] = item
                 self.tile_group.add(item)
+        self.refresh_dollar_value()
 
     def remove_tile(self, item):
         import gui
@@ -144,6 +154,7 @@ class Inventory(Display):
             if self.items[i][j] == item:
                 self.items[i][j] = None
                 self.tile_group.remove(item)
+        self.refresh_dollar_value()
 
     # check whether the mouse in in the grid
     def In_grid(self, x, y):
@@ -209,6 +220,7 @@ class Inventory(Display):
             for j in range(self.col):
                 self.items[i][j] = None
         self.tile_group.empty()
+        self.refresh_dollar_value()
 
     def contains_letter(self, letter: str) -> bool:
         from gui.base import Tile
@@ -221,3 +233,15 @@ class Inventory(Display):
 
         return False
 
+    def refresh_dollar_value(self):
+        if not self.display_dollar_value:
+            return
+        total = 0
+        for i, j in itertools.product(range(self.rows), range(self.col)):
+            if self.items[i][j] is not None:
+                total += self.items[i][j].score
+        if total > 0:
+            total *= total
+            self.dollar_value_txt = self.dv_font.render(f"${total}", 1, (0, 0, 0))
+        else:
+            self.dollar_value_txt = self.dv_font.render("", 1, (0, 0, 0))

@@ -14,7 +14,7 @@ from gui.label import Label, MessageList
 class TopBar(Display):
     def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells):
         super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
-        self.word = "Temp Rack"
+        self.word = ""
         self.round = 1
         self.max_round = 15
         self.round_font = pygame.font.SysFont("comicsans", 50)
@@ -45,8 +45,8 @@ class TopBar(Display):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
 
         # draw round
-        txt = self.round_font.render(f"Player {self.gameui.my_player_number + 1} "
-                                     f"Round {self.round} of {self.max_round}",
+        txt = self.round_font.render(f"Player {self.gameui.player_name} "
+                                     f"Round {self.round}",
                                      True, Colors.BLACK.value)
         win.blit(txt, (self.x + 10, self.y + self.height / 2 - txt.get_height() / 2))
 
