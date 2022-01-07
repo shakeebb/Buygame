@@ -3,7 +3,7 @@ Top bar displaying information about round
 """
 import pygame
 
-from common.game import Game
+from common.game import Game, Player
 from common.logger import log
 from gui.display import Display
 from common.gameconstants import *
@@ -25,12 +25,10 @@ class TopBar(Display):
         from gui.base import GameUI
         self.gameui: GameUI = None
         self.refresh_dims()
-        self.connect_status_color = Colors.YELLOW
-        self.connect_text = "Start"
         self.connection_button = TextButton(self.xmargin() - 7,
                                             self.v_margin_cells + int(self.height_cells / 2) - 1,
-                                            3, 2, self.connect_status_color, self.connect_text,
-                                            self.connect_status_color)
+                                            3, 2, Colors.YELLOW, "Init",
+                                            Colors.YELLOW)
         self.connection_button.change_font_size(15)
         self.server_msg = Label(self.xmargin() - 20,
                                 self.v_margin_cells + int(self.height_cells / 2),
@@ -62,15 +60,9 @@ class TopBar(Display):
         self.server_msg.draw(win)
         self.client_msgs.draw(win)
         if self.gameui is not None:
-            if self.gameui.network.is_connected:
-                self.set_connection_status(Colors.GREEN)
-            else:
+            if not self.gameui.network.is_connected:
                 self.set_connection_status(Colors.RED)
                 # self.button = pygame.draw.rect(win, self.color, self.start_button_pos, 0)
-                self.blink = True
-
-        self.connection_button.set_color(self.connect_status_color)
-        self.connection_button.set_text(self.connect_text)
         self.connection_button.draw(win)
         pygame.draw.circle(win, (0, 0, 0), (self.x + self.width - 50, self.y + round(self.height / 2)), 30,
                            self.BORDER_THICKNESS)
@@ -107,37 +99,48 @@ class TopBar(Display):
         :return: None
         """
         mouse = pygame.mouse.get_pos()
-        if self.connect_status_color is Colors.YELLOW and self.connection_button.click(*mouse):
-            try:
-                myGame = self.gameui.network.send(ClientMsgReq.Start.msg)
-                if myGame is not None and self.gameui.network.is_connected:
-                    self.gameui.set_game(myGame)
-                    if self.gameui.game().ready:
-                        color = Colors.GREEN
-                        _g: Game = self.gameui.game()
-                        self.client_msgs.add_msg(f"Game is ready. {len(_g.getPlayers())} players connected."
-                                                 f" Leader is {_g.leader + 1}",
-                                                 Colors.NAVY_BLUE)
-                    else:
-                        color = Colors.ORANGE
-                    self.set_connection_status(color, True)
-                    pygame.event.post(pygame.event.Event(EV_POST_START))
-            except Exception as e:
-                log("Start message failed", e)
-        elif self.connect_status_color is Colors.RED and self.connection_button.click(*mouse):
+        c = self.connection_button.get_color()
+        if c is Colors.YELLOW and self.connection_button.click(*mouse):
+            pass
+            # try:
+            #     myGame = self.gameui.network.send(ClientMsgReq.Start.msg)
+            #     if myGame is not None and self.gameui.network.is_connected:
+            #         self.gameui.set_game(myGame)
+            #         if self.gameui.game().ready:
+            #             color = Colors.GREEN
+            #             _g: Game = self.gameui.game()
+            #             self.client_msgs.add_msg(f"Game is ready. {len(_g.getPlayers())} players connected."
+            #                                      f" Leader is {_g.leader + 1}",
+            #                                      Colors.NAVY_BLUE)
+            #         else:
+            #             color = Colors.ORANGE
+            #         self.set_connection_status(color, True)
+            #         pygame.event.post(pygame.event.Event(EV_POST_START))
+            # except Exception as e:
+            #     log("Start message failed", e)
+        elif c is Colors.RED and self.connection_button.click(*mouse):
             try:
                 self.gameui.network.reconnect()
-                self.gameui.game = self.gameui.network.send(ClientMsgReq.Get.msg)
+                player: Player = self.gameui.me()
+                self.gameui.game = self.gameui.network.send(ClientMsgReq.Get.msg +
+                                                            "notifications_received=" +
+                                                            str(len(player.notify_msg))
+                                                            )
                 self.set_connection_status(Colors.GREEN)
             except Exception as e:
                 log("", e)
 
     def set_connection_status(self, s: Colors, override: bool = False):
-        if self.connect_status_color is not Colors.YELLOW or override is True:
-            self.connect_status_color = s
-            if s is Colors.GREEN:
-                self.connect_text = "Connected"
-            if s is Colors.ORANGE:
-                self.connect_text = "Waiting"
-            if s is Colors.RED:
-                self.connect_text = "ReConnect"
+        self.connection_button.set_color(s)
+        if s is Colors.YELLOW:
+            self.connection_button.set_text("Wait")
+            self.connection_button.set_blink(True)
+        elif s is Colors.GREEN:
+            self.connection_button.set_text("Play")
+            self.connection_button.set_blink(False)
+        elif s is Colors.ORANGE:
+            self.connection_button.set_text("Wait Round")
+            self.connection_button.set_blink(True)
+        elif s is Colors.RED:
+            self.connection_button.set_text("ReConnect")
+            self.connection_button.set_blink(True)

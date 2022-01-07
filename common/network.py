@@ -10,93 +10,42 @@ import socket
 import time
 from threading import Thread, Event, RLock
 
+from common.game import Game
 from common.gameconstants import *
 from common.logger import log
 
 
-def createMessage(message: str):
-    try:
-        if message is not None:
-            message = message.encode('utf-8')
-
-        return message
-        # creates message ready for socket 
-        # needs message, HEADER_LENGTH
-        # returns message ready for socket 
-    except Exception as e:
-        log("create message failed", e)
-
-
-def createPickle(aPickle):
-    aPickled = pickle.dumps(aPickle)
-    aPickled = bytes(aPickled)
-    return aPickled
-
-
-def receive_pickle(client_socket):
-    try:
-        message_length = 0
-        while message_length == 0:
-            message_header = client_socket.recv(SERIALIZE_HEADER_LENGTH)
-            if not len(message_header):
-                return False
-            # print("first", message_header)
-            mh_b = message_header.decode('utf-8', 'ignore').strip()
-            message_length = int(mh_b)
-            # print("message_header_bytes ", mh_b, " message_length ", message_length)
-
-        # print("message_length", message_length)
-        message = b''
-        while len(message) != message_length:
-            message = recvall(client_socket, message_length)
-        # print(f"len(message) {len(message)} -- message {message}")
-        unpickled = pickle.loads(message)
-        # print("unpickled", unpickled)
-        return unpickled
-    except Exception as e:
-        log("deserialization failed: ", e)
-        return False
-
-
-def recvall(sock, size):
-    received_chunks = []
-    buf_size = 4096
-    remaining = size
-    while remaining > 0:
-        received = sock.recv(min(remaining, buf_size), socket.MSG_WAITALL)
-        # print(f"len(received) {len(received)} remaining {remaining}")
-        if not received:
-            raise Exception('unexpected EOF')
-        received_chunks.append(received)
-        remaining -= len(received)
-    return b''.join(received_chunks)
-
-
-def receive_message(client_socket):
-    try:
-        message_header = client_socket.recv(MSG_HEADER_LENGTH, socket.MSG_WAITALL)
-        if not len(message_header):
-            return False
-
-        message_length = int(message_header.decode('utf-8', 'ignore').strip())
-        return client_socket.recv(message_length, socket.MSG_WAITALL).decode('utf-8')
-    except Exception as e:
-        log("receive message failed with", e)
-        return False
+# def createMessage(message: str):
+#     try:
+#         if message is not None:
+#             message = message.encode('utf-8')
+#
+#         return message
+#         # creates message ready for socket
+#         # needs message, HEADER_LENGTH
+#         # returns message ready for socket
+#     except Exception as e:
+#         log("create message failed", e)
+#
+#
+# def createPickle(aPickle):
+#     aPickled = pickle.dumps(aPickle)
+#     aPickled = bytes(aPickled)
+#     return aPickled
+from common.utils import receive_message, receive_pickle, serialize, ObjectType
 
 
 class Network:
-    def __init__(self):
-        log("creating client socket")
+    def __init__(self, ip, port, session_id, player_name):
+        log(f"creating {player_name} client socket to {ip}:{port} with {session_id}")
         self.client: socket = self.create_client_socket()
         self.is_connected = False
-        self.server = "localhost"
-        # self.port = 1234
-        # self.server = "23.239.14.203"
-        self.port = 1234
-        self.addr = (self.server, self.port)
+        self.server = ip
+        self.port = port
+        self.session_id: str = session_id
+        self.player_name = player_name
+        self.addr = (self.server, int(self.port))
         self.con_mutex = RLock()
-        self.p = int(self.connect())
         log("done initialize")
 
     def create_client_socket(self, try_close_existing=False):
@@ -129,7 +78,7 @@ class Network:
                     return
                 if VERBOSE:
                     log("HB sending")
-                self.client.sendall(createMessage(ClientMsgReq.HeartBeat.msg))
+                self.client.sendall(serialize(ObjectType.MESSAGE, ClientMsgReq.HeartBeat.msg))
                 resp = receive_message(self.client)
                 if VERBOSE:
                     log("HB received " + str(resp))
@@ -144,30 +93,43 @@ class Network:
     def reconnect(self):
         with self.con_mutex:
             try:
-                log("creating fresh client socket")
-                self.client = self.create_client_socket(True)
-                self.client.connect(self.addr)
-                self.is_connected = True
+                self.__connect(True)
                 log("client socket created")
             except Exception as e:
                 log("reconnect failed with", e)
                 self.is_connected = False
 
-    def connect(self):
+    def connect(self) -> Game:
         with self.con_mutex:
             try:
                 log("time to connect")
-                self.client.connect(self.addr)
-                log("connected successful")
-                time.sleep(0.001)
-                myP = receive_message(self.client)
-                myNumber = int(myP)
-                self.is_connected = True
-                return myNumber
+                return self.__connect(False)
             except Exception as e:
                 log("failed to connect", e)
                 self.is_connected = False
                 raise e
+
+    def __connect(self, try_closing: bool) -> Game:
+        self.client = self.create_client_socket(try_closing)
+        try:
+            self.client.connect(self.addr)
+            self.is_connected = True
+            if len(self.session_id) == 0:
+                s_id = f"[{self.player_name}]"
+            else:
+                s_id = self.session_id
+            _g = self.send(ClientMsgReq.SessionID.msg + s_id)
+            assert _g is None or isinstance(_g, Game)
+            game: Game = _g
+            time.sleep(0.001)
+            new_session_id = receive_message(self.client, block=True)
+            if len(new_session_id) > 0:
+                self.session_id = new_session_id
+                self.is_connected = True
+            return game
+        except Exception as e:
+            log("Network:Connect exception: ", e)
+            self.is_connected = False
 
     def send(self, data: str) -> object:
         sleepTime = 0.01
@@ -179,7 +141,8 @@ class Network:
             with self.con_mutex:
                 try:
                     # print("trying to send data to server")
-                    self.client.send(createMessage(data))
+                    payload = serialize(ObjectType.MESSAGE, data)
+                    self.client.send(payload)
                     self.is_connected = True
                     # print(f"{data} sent")
                     time.sleep(0.01)

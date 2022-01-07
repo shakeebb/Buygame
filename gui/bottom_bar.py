@@ -60,6 +60,7 @@ class BottomBar(Display):
         self.__enable_buy = False
         self.__enable_sell = False
         self.last_rolled_dice_no = -1
+        self.hide_all()
 
     def refresh_dims(self):
         super().refresh_dims()
@@ -113,26 +114,23 @@ class BottomBar(Display):
 
         if self.__enable_buy:
             if self.help_button.click(*mouse):
-                self.__enable_buy = False
-                self.game.game_status = GameStatus.BUY
-                self.revert_to_orig()
+                self.game.game_status = GameUIStatus.BUY
+                self.hide_all()
                 return
             elif self.remove_button.click(*mouse):
                 self.__enable_buy = False
-                self.game.game_status = GameStatus.CANCEL_BUY
-                self.revert_to_orig()
+                self.game.game_status = GameUIStatus.CANCEL_BUY
+                self.hide_all()
                 return
 
         if self.__enable_sell:
             if self.help_button.click(*mouse):
-                self.__enable_sell = False
-                self.game.game_status = GameStatus.SELL
-                self.revert_to_orig()
+                self.game.game_status = GameUIStatus.SELL
+                self.hide_all()
                 return
             elif self.remove_button.click(*mouse):
-                self.__enable_sell = False
-                self.game.game_status = GameStatus.CANCEL_SELL
-                self.revert_to_orig()
+                self.game.game_status = GameUIStatus.CANCEL_SELL
+                self.hide_all()
                 return
 
         # if self.backtome.click(*mouse):
@@ -159,19 +157,11 @@ class BottomBar(Display):
 
             self.handle_rolled_dice(dice_value)
 
-    def handle_rolled_dice(self, dice_value: int):
-        self.last_rolled_dice_no = dice_value
-        self.__enable_dice_rolling = False
-        self.dice = None
-        self.game.game_status = GameStatus.DICE_ROLL_COMPLETE
-        self.revert_to_orig()
-
     def prompt_input(self):
         self.game.top_bar.client_msgs.add_msg("Your Choice. Enter between 2 to 5")
         self.help_button.set_text(" Choose ")
-        self.remove_button.hide()
         self.option_button.show()
-        self.game.game_status = GameStatus.PROMPT_DICE_INPUT
+        self.game.game_status = GameUIStatus.PROMPT_DICE_INPUT
         # enable input field & validate
         # return random.randint(2, 5)
 
@@ -180,21 +170,21 @@ class BottomBar(Display):
         msg = "Chosen dice value: " + str(user_chosen_dice_value)
         self.game.top_bar.client_msgs.add_msg(msg, Colors.RED)
         self.handle_rolled_dice(user_chosen_dice_value)
-        self.help_button.set_text(" Help ")
-        self.remove_button.show()
-        self.option_button.hide()
+        self.hide_all()
+
+    def handle_rolled_dice(self, dice_value: int):
+        self.last_rolled_dice_no = dice_value
+        self.__enable_dice_rolling = False
+        self.dice = None
+        self.game.game_status = GameUIStatus.DICE_ROLL_COMPLETE
+        self.hide_all()
 
     def enable_dice_rolling(self):
         self.last_rolled_dice_no = -2
         self.__enable_dice_rolling = True
         self.help_button.set_text(" ROLL ")
         self.help_button.set_color(Colors.GREEN)
-
-    def revert_to_orig(self):
-        self.help_button.set_text("  Help ")
-        self.help_button.set_color(Colors.DARK_GRAY)
-        self.remove_button.set_text(" Remove ")
-        self.remove_button.set_color(Colors.DARK_GRAY)
+        self.help_button.show()
 
     def enable_buy(self):
         self.__enable_buy = True
@@ -202,6 +192,8 @@ class BottomBar(Display):
         self.help_button.set_color(Colors.GREEN)
         self.remove_button.set_text(" CANCEL ")
         self.remove_button.set_color(Colors.GREEN)
+        self.help_button.show()
+        self.remove_button.show()
 
     def enable_sell(self):
         self.__enable_sell = True
@@ -209,3 +201,19 @@ class BottomBar(Display):
         self.help_button.set_color(Colors.GREEN)
         self.remove_button.set_text(" CANCEL ")
         self.remove_button.set_color(Colors.GREEN)
+        self.help_button.show()
+        self.remove_button.show()
+
+    def hide_all(self):
+        self.__enable_dice_rolling = False
+        self.__enable_buy = False
+        self.__enable_sell = False
+
+        self.help_button.set_text("  -- ")
+        self.help_button.set_color(Colors.DARK_GRAY)
+        self.remove_button.set_text(" -- ")
+        self.remove_button.set_color(Colors.DARK_GRAY)
+
+        self.help_button.hide()
+        self.remove_button.hide()
+        self.option_button.hide()

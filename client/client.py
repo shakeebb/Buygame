@@ -41,7 +41,7 @@ def receivedRacks(myPlayer, n, myNumber):
                 except Exception as e:
                     print(e)
                 while True:
-                    serverMessage = myGame.getServerMessage()
+                    serverMessage = myGame.get_server_message()
                     print(f"serverMessage: {serverMessage} ")
                     if ClientResp.Bought.msg in serverMessage:
                         break
@@ -77,7 +77,7 @@ def receivedRacks(myPlayer, n, myNumber):
                 while True:
                     myGame = n.send(ClientMsgReq.Get.msg)
                     time.sleep(1)
-                    serverMessage = myGame.getServerMessage()
+                    serverMessage = myGame.get_server_message()
                     print(f"serverMessage: {serverMessage} ")
                     if ClientResp.Sold.msg in serverMessage:
                         break
@@ -174,7 +174,7 @@ def main():
                 print("game state is ready ")
                 print(f"{len(myGame.getPlayers())} players are connnected")
                 beginOrNo = input("Do you want to begin (Y/N) ").upper()
-                print(myGame.getServerMessage())
+                print(myGame.get_server_message())
                 if beginOrNo == 'Y':
                     inLobby = False
                     if myGame.leader == myNumber:
@@ -189,7 +189,7 @@ def main():
         # %%
         if myGame.rolled is True:
             # leader rolled
-            serverMessage = myGame.getServerMessage()
+            serverMessage = myGame.get_server_message()
 
             # %% racks are handed
             if ClientResp.Racks_Ready.msg in serverMessage:
@@ -201,11 +201,11 @@ def main():
                     print(e)
             # players could be done
             # %%
-            if ClientResp.Done.msg in myGame.getServerMessage():
+            if ClientResp.Done.msg in myGame.get_server_message():
                 print(f"round {i} done, time for next round ")
                 i += 1
-            elif ClientResp.Not_Ready.msg in myGame.getServerMessage():
-                print(myGame.getServerMessage())
+            elif ClientResp.Not_Ready.msg in myGame.get_server_message():
+                print(myGame.get_server_message())
         # %%
         else:
             # we have not rolled dice

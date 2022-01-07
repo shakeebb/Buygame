@@ -23,63 +23,22 @@ import pandas as pd
 from common.game import *
 from common.gameconstants import *
 from common.logger import log
-from datetime import  datetime
+from datetime import datetime
 
+from common.utils import serialize, deserialize, receive_message, ObjectType
 from server.socket import ClientSocket
 
 script_path = os.path.dirname(os.path.abspath(__file__))
-
-def createMessage(message):
-    message = f"{len(message):<{MSG_HEADER_LENGTH}}".encode(
-        'utf-8') + message.encode('utf-8')
-    return message
-
-
-def createPickle(aPickle):
-    aPickled = pickle.dumps(aPickle)
-    aPickled = bytes(f"{len(aPickled):<{SERIALIZE_HEADER_LENGTH}}".encode(
-        'utf-8') + aPickled)
-    return aPickled
-
-
-def receive_message(_cs) -> str:
-    try:
-        message_header = _cs.recv(MSG_HEADER_LENGTH)
-        if not len(message_header):
-            return None
-        message = message_header.decode('utf-8').strip()
-        return str(message)
-    except Exception as e:
-        log("receive message from client failed", e)
-        return None
-
-
-def receive_pickle(client_socket):
-    try:
-        message_header = client_socket.recv(SERIALIZE_HEADER_LENGTH)
-        if not len(message_header):
-            return False
-        # print("first", message_header)
-        message_length = int(message_header.decode('utf-8').strip())
-        message = client_socket.recv(message_length, socket.MSG_WAITALL)
-        # print("message", message)
-        unpickled = pickle.loads(message)
-        # print("unpickled", unpickled)
-        return unpickled
-    except Exception as e:
-        log("receive pickle from client failed", e)
-        return False
 
 
 class Server:
     def __init__(self):
         self.GAMETILES = pd.read_csv(os.path.join(script_path, "tiles.csv"), index_col="LETTER")
-        # bag = GAMETILES
         # self.WordDict = pd.read_json(os.path.join(script_path, 'words_dictionary.json'), typ='series').index
         self.word_dict_csv = pd.read_csv(os.path.join(script_path, 'words_dictionary-2.csv'))  # , index_col='words')
 
-        HEADER_LENGTH = 2048
-        self.IP = "localhost"
+        # self.IP = "localhost"
+        self.IP = "0.0.0.0"
         self.PORT = 1234
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # SO_REUSEADDR  is being set to 1(true), if program is restarted TCP socket we created can be used again
@@ -96,7 +55,7 @@ class Server:
         self.clients = {}
         self.number_of_usr = 0
         self.waitingForGameToStart = True
-        self.games: [int, Game] = {}
+        self.games: [Game] = []
         self.gameId = 0
         self.number_of_usr = 0
         self.cleanup_interval = Event()
@@ -104,39 +63,35 @@ class Server:
     def main(self):
         # Waiting for players to join lobby and to start game
         try:
+            # start_new_thread(self.cleanup_thread, ())
+            ct = threading.Thread(target=self.cleanup_thread,
+                                  name="cleanup-thread",
+                                  daemon=True)
+            ct.start()
+            self.threads_list.append(ct)
+
             while True:
                 client_socket, client_address = self.server_socket.accept()
                 client_socket.setblocking(True)
                 # adding client socket to list of users
                 log(f"[CONNECTION] {client_address} connected!")
-                cs = ClientSocket(client_socket, self.gameId, len(self.client_sockets_list))
+                cs = ClientSocket(client_socket)
+                g, player, new_session_id = self.handshake(cs)
+                cs.post_handshake(g.id, player)
                 self.client_sockets_list.append(cs)
-                if self.number_of_usr == 0:
-                    log("Creating a new game....")
-                    self.games[self.gameId] = Game(self.gameId, self.GAMETILES)
-                    # start_new_thread(self.cleanup_thread, ())
-                    ct = threading.Thread(target=self.cleanup_thread,
-                                          name="cleanup-thread",
-                                          daemon=True)
-                    ct.start()
-                    self.threads_list.append(ct)
-
-                log("creating player object...")
-                # Giving player their own socket in dictionary
-                self.clients[self.number_of_usr] = Player(int(nofw), int(self.number_of_usr),
-                                                          self.games[self.gameId].getGameBag())
-                # putting player in game
-                log("player created")
-                self.games[self.gameId].setClients(self.clients)
-                log("setting clients to game \n sending game to client")
+                # always send the game object as response and then may be other responses.
+                cs.socket.sendall(serialize(ObjectType.OBJECT, g))
+                log(f"game sent to client. new session id {new_session_id}")
+                cs.socket.sendall(serialize(ObjectType.MESSAGE, new_session_id))
+                # cs.socket.sendall(create_pickle(g))
+                log("handshake complete")
                 # sending game to player
                 # start_new_thread(self.threaded, (cs, self.gameId))
-                ct = threading.Thread(target=self.threaded, args=(cs, self.gameId),
+                ct = threading.Thread(target=self.threaded, args=(cs, g),
                                       name=cs.thread_name,
                                       daemon=False)
                 ct.start()
                 self.threads_list.append(ct)
-                log("game sent to client ")
                 self.number_of_usr += 1
         finally:
             self.cleanup_interval.set()
@@ -148,30 +103,31 @@ class Server:
 
             self.server_socket.close()
 
-    def threaded(self, _cs: ClientSocket, _game_id):
+    def threaded(self, _cs: ClientSocket, game: Game):
+        assert _cs.player.game.id == game.id
         # c is socket
-        stringp = str(_cs.player_num)
-        print(f"connected is player {stringp}")
-        p = createMessage(stringp)
+        stringp = str(_cs.player.number)
+        log(f"ready to process messages from {stringp}")
+        p = serialize(ObjectType.MESSAGE, stringp)
         decodedP = int(p.decode('utf-8')[-1])
-        _cs.socket.send(p)
+        # _cs.socket.send(p)
         while _cs.is_active:
             try:
                 # data received from client
                 payload: str = receive_message(_cs.socket)
-                if payload is None:
+                if payload is None or (isinstance(payload, bool) and not bool(payload)):
                     # slow down the next STREAM SOCKET read
                     time.sleep(1)
                     continue
                 if VERBOSE:
                     log(f"received message payload [{payload}] from Player {decodedP}")
-                with self.games[_game_id].game_mutex:
-                    self.handle_client_msg(_cs, decodedP, _game_id, payload)
+                with game.game_mutex:
+                    self.handle_client_msg(_cs, decodedP, game, payload)
             except Exception as e:
                 log("unknown error in client handling thread", e)
                 # %%
                 break
-
+        _cs.player.game.player_left(_cs.player)
         # current_game: Game = self.games[_game_id]
         # players_map = dict(current_game.get_players_map())
         # removed_player: Player = players_map.pop(decodedP)
@@ -208,137 +164,221 @@ class Server:
                 x = (curr_ts - _cs.last_hb_received).total_seconds()
                 y = (HEARTBEAT_INTERVAL_SECS * 2.0)
                 if x > y:
-                    log(f"Cleaning up player {_cs.player_num} socket")
+                    log(f"Cleaning up player {_cs} socket")
                     stale = self.client_sockets_list.pop(i)
                     stale.mark_inactive()
                 i -= 1
             self.cleanup_interval.wait(HEARTBEAT_INTERVAL_SECS)
 
     def handle_client_msg(self, _cs: ClientSocket, decoded_p: int,
-                          _game_id: int,
+                          game: Game,
                           payload: str):
         # if _game_id in games:
-        current_game = self.games[_game_id]
-        n = len(current_game.get_players_map().keys())
+        # current_game = game
         # if bool(payload) is not False:
         (msg_enum, data) = payload.split(':')
-        log(f"client request: {msg_enum}") if msg_enum not in ClientMsgReq.HeartBeat.msg else None
+        log(f"client request: {msg_enum} - {data}") if msg_enum not in ClientMsgReq.HeartBeat.msg else None
         client_req: ClientMsgReq = ClientMsgReq.parse_msg_string(msg_enum + ':')
         # %% set player ready
         if ClientMsgReq.HeartBeat == client_req:
             log("sending heartbeat response") if VERBOSE else None
-            _cs.socket.sendall(createMessage(ClientMsgReq.HeartBeat.msg))
+            _cs.socket.sendall(serialize(ObjectType.MESSAGE, ClientMsgReq.HeartBeat.msg))
             _cs.set_last_active_ts()
             return
-        elif ClientMsgReq.Start == client_req:
-            log("player wants to start game ")
-            # sets player ready
-            current_game.getPlayer(decoded_p).set_start()
-            # %%  check if all connected are ready
-            readyMessage = ""
-            for player in current_game.getPlayers():
-                if player.start is False:
-                    readyMessage += f" {player.number} not ready "
-            if readyMessage:
-                current_game.setServerMessage(
-                    f"Not all players are ready. status {current_game.isReady()}")
-            # %% sets leader
-            else:
-                _p: Player = random.choice(current_game.getPlayers())
-                current_game.setPlayer(_p.number)
-                current_game.setReady(_p.number)
-                self.games[_game_id] = current_game
-                current_game.setServerMessage(
-                    "game ready to start ")
-            # %%
-
-        elif ClientMsgReq.Name == client_req:
-            client_name = data
-            current_game.getPlayer(decoded_p).name = client_name
-            log(current_game.getPlayer(decoded_p).name)
-            current_game.setServerMessage("player changed name")
+        # elif ClientMsgReq.Start == client_req:
+        #     log("player wants to start game ")
+        #     # sets player ready
+        #     current_game.getPlayer(decoded_p).set_start()
+        #     # %%  check if all connected are ready
+        #     readyMessage = ""
+        #     for player in current_game.getPlayers():
+        #         if player.start is False:
+        #             readyMessage += f" {player.number} not ready "
+        #     if readyMessage:
+        #         current_game.setServerMessage(
+        #             f"Not all players are ready. status {current_game.isReady()}")
+        #     # %% sets leader
+        #     else:
+        #         _p: Player = random.choice(current_game.getPlayers())
+        #         current_game.setPlayer(_p.number)
+        #         current_game.setReady(_p.number)
+        #         # self.games[_game_id] = current_game
+        #         current_game.setServerMessage(
+        #             "game ready to start ")
+        #     # %%
+        #
+        # elif ClientMsgReq.Name == client_req:
+        #     client_name = data
+        #     current_game.getPlayer(decoded_p).name = client_name
+        #     log(current_game.getPlayer(decoded_p).name)
+        #     current_game.setServerMessage("player changed name")
         elif ClientMsgReq.Dice == client_req:
-            diceValue = data
-            diceValue = int(diceValue)
+            diceValue = int(data)
             log(f"diceValue is {diceValue}")
-            if current_game.bag.get_remaining_tiles() < (
-                    diceValue * n):
-                log("no more bags")
-                return
-            else:
-                # %% we have enough, are racks initialized?
-                # giving racks their bag and dice values
-                for player in current_game.get_players_map():
-                    try:
-                        current_game.getPlayer(player).rack.clear_rack()
-                    except Exception as e:
-                        log("clear rack failed", e)
-                current_game.setRolled()
-                current_game.setRacks(diceValue)
-                current_game.setServerMessage(ClientResp.Racks_Ready.msg)
-                log("handed racks to all")
-                self.games[_game_id] = current_game
-                for player in current_game.getPlayers():
-                    try:
-                        log(player.get_rack_str())
-                        log(player.get_temp_str())
-                    except Exception as e:
-                        log("rack to str failed", e)
-        # %% get
+            game.player_rolled(diceValue)
+            game.set_server_message(ClientResp.Racks_Ready.msg)
+
         elif ClientMsgReq.Get == client_req:
             log("[GET]")
-        # %%
+            msgs_notified_upto = int(str(data).removeprefix("notifications_received="))
+            _q: deque = _cs.player.notify_msg
+            while _q.__len__() > 0:
+                n = _q.__iter__().__next__()
+                if n.n_id <= msgs_notified_upto:
+                    _popped_m = _cs.player.notify_msg.popleft()
+                    # log(f"SB: discarding notify msg {_popped_m}")
+                else:
+                    break
+
         elif ClientMsgReq.Buy == client_req:
             try:
-                current_game.getPlayer(decoded_p).buy_word()
-                current_game.setServerMessage(f"{ClientResp.Bought.msg} Player {decoded_p}")
+                _cs.player.buy_word()
+                game.set_server_message(f"{ClientResp.Bought.msg} Player {decoded_p}")
             except Exception as e:
-                log("buy failed", e)
-        # %%
+                log(f"{game} {_cs.player} buy failed", e)
+
         elif ClientMsgReq.Cancel_Buy == client_req:
             try:
-                current_game.getPlayer(decoded_p).cancel_buy(current_game.bag)
-                current_game.setServerMessage(f"{ClientResp.Buy_Cancelled.msg} Player {decoded_p}")
+                _cs.player.cancel_buy(game.bag)
+                game.set_server_message(f"{ClientResp.Buy_Cancelled.msg} Player {decoded_p}")
             except Exception as e:
-                log("buy cancellation failed", e)
-        # %%
+                log(f"{game} {_cs.player} buy cancellation failed", e)
+
         elif ClientMsgReq.Sell == client_req:
             try:
                 word = data
-                _player = current_game.getPlayer(decoded_p)
-                _player.sell(word, self.word_dict_csv)
-                if _player.sell_check:
-                    current_game.setServerMessage(f"{ClientResp.Sold.msg} {word} Player {decoded_p}")
+                ret_val = _cs.player.sell(word, self.word_dict_csv)
+                if _cs.player.sell_check:
+                    if ret_val == GameState.SELL:
+                        game.set_server_message(f"{ClientResp.Sold_Sell_Again.msg} word={word}")
+                    else:
+                        game.set_server_message(f"{ClientResp.Sold.msg} word={word}")
                 else:
-                    current_game.setServerMessage(f"{ClientResp.Sell_Failed.msg} {word} Player {decoded_p}")
+                    game.set_server_message(f"{ClientResp.Sell_Failed.msg} word={word}")
             except Exception as e:
-                log("sell failed", e)
-        # %%
+                log(f"{game} {_cs.player} sell failed", e)
+
+        elif ClientMsgReq.Cancel_Sell == client_req:
+            if _cs.player.get_remaining_letters() > 0:
+                game.set_server_message(f"{ClientResp.Sell_Cancelled_Sell_Again.msg}"
+                                        f" Player {decoded_p}")
+                game.player_sold(_cs.player, True)
+            else:
+                game.set_server_message(f"{ClientResp.Sell_Cancelled.msg} Player {decoded_p}")
+                game.player_sold(_cs.player, True)
+        """# %%
         elif ClientMsgReq.Is_Done == client_req:
             round_enquiry = int(data)
-            assert round_enquiry <= current_game.turn
-            if round_enquiry == current_game.turn:
-                readyOrNot = current_game.checkReady()
+            assert round_enquiry <= game.round
+            if round_enquiry == game.round:
+                readyOrNot = game.checkReady()
                 if not readyOrNot:
                     msg = ClientResp.Done.msg + f" round: {current_game.turn}"
                     current_game.nextTurn()
-                    current_game.setServerMessage(msg + f" curPlayer {current_game.currentPlayer}")
+                    current_game.set_server_message(msg + f" curPlayer {current_game.currentPlayer}")
                 else:
                     line = ",".join([name for name in readyOrNot])
                     line += " is " + ClientResp.Not_Ready.msg + " in round " + str(current_game.turn)
-                    current_game.setServerMessage(line)
+                    current_game.set_server_message(line)
             elif round_enquiry < current_game.turn:
-                current_game.setServerMessage(ClientResp.Done.msg + f" prev round: {round_enquiry}")
+                current_game.set_server_message(ClientResp.Done.msg + f" prev round: {round_enquiry}")
         # %%
         elif ClientMsgReq.Played == client_req:
             current_game.getPlayer(decoded_p).played = True
-            current_game.setServerMessage(f"{ClientResp.Played.msg} Player {decoded_p}")
-
-        self.games[_game_id] = current_game
-        serverMessage = current_game.getServerMessage()
+            current_game.set_server_message(f"{ClientResp.Played.msg} Player {decoded_p}")
+        """
+        # self.games[_game_id] = current_game
+        serverMessage = game.get_server_message()
         log(f"serverMessage: {serverMessage} ")
-        _cs.socket.sendall(createPickle(current_game))
+        _cs.socket.sendall(serialize(ObjectType.OBJECT, game))
         _cs.set_last_active_ts()
+
+    def handshake(self, cs: ClientSocket):
+        while True:
+            payload = receive_message(cs.socket, True)
+            log(f"handshake: received msg: {payload}")
+            (msg_enum, data) = payload.split(':')
+            client_req: ClientMsgReq = ClientMsgReq.parse_msg_string(msg_enum + ':')
+            assert ClientMsgReq.SessionID == client_req
+
+            import re
+            parts = re.findall("\\[([^[\\]]*)\\]", str(data))
+
+            def split_get(idx):
+                return parts[idx].split('=')[1]
+
+            # if only player name is received.
+            if len(parts) == 1:
+                game_id = -1
+                begin_time = ""
+                team_id = 0
+                player_id = -1
+                player_name = parts[0]
+            else:
+                game_id = int(split_get(0))
+                team_id = int(split_get(1))
+                player_id = int(split_get(2))
+                player_name = parts[3]
+                begin_time = parts[4]
+
+            g = None
+            for _g in self.games:
+                if _g.id == game_id and _g.begin_time == begin_time:
+                    g = _g
+                    break
+
+            def get_latest_unpaired_game():
+                if len(self.games) == 0:
+                    return None
+
+                open_games = list(filter(lambda _g: _g.game_state != GameState.END and len(_g.players()) == 1,
+                                         self.games))
+                if len(open_games) > 0:
+                    latest_g = open_games[0]
+                    return latest_g
+
+                return None
+
+            player = None
+            # if requested game of the player don't exists anymore.
+            if g is None:
+                unpaired_game = get_latest_unpaired_game()
+                if unpaired_game is not None:
+                    typed_g: Game = unpaired_game
+                    player_id = 1
+                    player = Player(typed_g, int(nofw), player_id, player_name, team_id,
+                                    unpaired_game.get_game_bag())
+                    typed_g.add_player(player_id, player)
+                    log(f"attaching new player {player} to an existing game {unpaired_game}")
+                    g = typed_g
+                    game_id = typed_g.id
+                    begin_time = typed_g.begin_time
+                else:
+                    self.gameId = self.gameId + 1
+                    g = Game(self.gameId, self.GAMETILES)
+                    game_id = g.id
+                    begin_time = g.begin_time
+                    log(f"created a new game.... {g}")
+                    self.games.append(g)
+                    player_id = 0
+                    # Giving player their own socket in dictionary
+                    player = Player(g, int(nofw), player_id, player_name, team_id,
+                                    g.get_game_bag())
+                    # putting player in game
+                    g.add_player(player_id, player)
+                    player.set_notify(NotificationType.INFO, "Waiting for another player to join")
+                    log(f"created first player {player} {g}")
+            else:
+                assert isinstance(g, Game)
+                player = g.player_joined(player_id, team_id)
+                log(f"resuming for player {player} in an existing game {g}")
+
+            def create_session_id():
+                return str(f"[g={game_id}]-[t={team_id}]-[p={player_id}]-"
+                           f"[{player_name}]-[{begin_time}]")
+
+            g.set_server_message(f"{player.name} handshake complete")
+            return g, player, create_session_id()
 
 
 if __name__ == '__main__':

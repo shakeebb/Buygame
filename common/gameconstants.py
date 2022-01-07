@@ -2,6 +2,7 @@ from enum import Enum, Flag, auto
 
 import pygame as pg
 from pygame.constants import *
+from pathlib import Path
 
 LOG = True
 VERBOSE = False
@@ -11,11 +12,24 @@ DISPLAY_TILE_GRID = False
 DISPLAY_TILE_GRID_OUTPUT = False
 
 HEARTBEAT_INTERVAL_SECS = 10.0
-WAIT_POLL_INTERVAL = 2.0
-MSG_HEADER_LENGTH = 2048
-SERIALIZE_HEADER_LENGTH = 4
+WAIT_POLL_INTERVAL = 3.0
+STD_HEADER_LENGTH = 10
 MAX_RECONNECT_TIME = 16
 WILD_CARD = "*"
+MAX_LETTERS_ON_HOLD = 8
+
+DEFAULT_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/.default_settings.yaml')
+SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/settings.yaml')
+SETTINGS_TEMPLATE = {
+    "server_defaults": {
+        "ip": "23.239.14.203",
+        "port": "1234"
+    }
+    ,
+    "user_defaults": {
+
+    }
+}
 
 FPS = 30  # frames per second, the general speed of the program
 
@@ -71,12 +85,14 @@ EV_POST_START = EV_DICE_ROLL + 1
 
 
 class ClientMsgReq(Enum):
+    SessionID = "session_id:"
     Name = "name:"
     Start = "start:"
     Dice = "dice:"
     Buy = "buy:"
     Cancel_Buy = "cancel_buy:"
     Sell = "sell:"
+    Cancel_Sell = "cancel_sell:"
     Get = "get:"
     HeartBeat = "heartbeat:"
     Is_Done = "is_done:"
@@ -95,6 +111,9 @@ class ClientResp(Enum):
     Bought = "bought:"
     Buy_Cancelled = "buy_cancelled:"
     Sold = "sold:"
+    Sold_Sell_Again = "sold_sell_again:"
+    Sell_Cancelled_Sell_Again = "sell_cancelled_sell_again:"
+    Sell_Cancelled = "sell_cancelled:"
     Sell_Failed = "sell_failed:"
     Turn_End = "turn ended:"
     Played = "played:"
@@ -105,9 +124,10 @@ class ClientResp(Enum):
         self.msg = text
 
 
-class GameStatus(Enum):
+class GameUIStatus(Enum):
     INITIAL_STATE = auto()
     ERROR = auto()
+    WAIT_START = auto()
     PLAY = auto()
     ROLL_DICE = auto()
     PROMPT_DICE_INPUT = auto()
@@ -117,14 +137,17 @@ class GameStatus(Enum):
     ENABLE_BUY = auto()
     BUY_ENABLED = auto()
     BUY = auto()
-    CANCEL_BUY = auto()
     BOUGHT = auto()
     BUY_FAILED = auto()
+    CANCEL_BUY = auto()
+    BUY_CANCELLED = auto()
+    BUY_CANCEL_FAILED = auto()
     ENABLE_SELL = auto()
     SELL_ENABLED = auto()
     SELL = auto()
     CANCEL_SELL = auto()
     SOLD = auto()
+    SELL_AGAIN = auto()
     SELL_FAILED = auto()
     I_PLAYED = auto()
     END_TURN = auto()

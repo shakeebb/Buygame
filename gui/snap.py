@@ -4,7 +4,7 @@ import pygame
 
 from common.logger import log
 from gui.display import Display
-from common.gameconstants import VERBOSE, INIT_TILE_SIZE, Colors
+from common.gameconstants import VERBOSE, Colors
 
 
 class Inventory(Display):
@@ -36,8 +36,8 @@ class Inventory(Display):
         self.border_color = border_color
         self.box_color = box_color
         self.tile_group = pygame.sprite.LayeredUpdates()
-        from gui.base import Tile
-        self.items: [[Tile]] = []
+        from gui import base
+        self.items: [[base.Tile]] = []
         # self.items: [[Tile]] = [[None for _ in range(cols)] for _ in range(rows)]
         self.inv_slots: [[Inventory.Slot]] = []
         for x, y in itertools.product(range(rows), range(cols)):
@@ -151,7 +151,9 @@ class Inventory(Display):
         assert isinstance(item, gui.base.Tile)
 
         for i, j in itertools.product(range(self.rows), range(self.col)):
-            if self.items[i][j] == item:
+            from gui.base import Tile
+            x: Tile = self.items[i][j]
+            if x is not None and x.id == item.id:
                 self.items[i][j] = None
                 self.tile_group.remove(item)
         self.refresh_dollar_value()

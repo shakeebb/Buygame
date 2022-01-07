@@ -1,31 +1,127 @@
 """
 Shows the main menu for the game, gets the user name before starting
 """
+import os
+import sys
+from pathlib import Path
+
 import pygame
+from pygame.event import Event
 from pygame.locals import *
 
-from gui.base import GameUI
-from common.gameconstants import MAX_NAME_LENGTH
+from common.gameconstants import MAX_NAME_LENGTH, SETTINGS_FILE, SETTINGS_TEMPLATE, Colors, DEFAULT_SETTINGS_FILE
 from common.logger import log, logger
 from gui.display import Display
+import yaml
+
+
+class InputText:
+    def __init__(self, x: int, y: int, prompt,
+                 default: str,
+                 in_focus: bool = False):
+        self.prompt = prompt
+        self.text = default
+        self.in_focus = in_focus
+        self.x = x
+        self.y = y
+
+    def set_text(self, txt):
+        if txt is None:
+            return
+        self.text = txt
+
+    def type(self, char):
+        if char == "backspace":
+            if len(self.text) > 0:
+                self.text = self.text[:-1]
+        elif char == "space":
+            self.text += " "
+        elif len(char) == 1:
+            self.text += char
+
+        if len(self.text) >= MAX_NAME_LENGTH:
+            self.text = self.text[:MAX_NAME_LENGTH]
+
+    def begin_input(self):
+        self.in_focus = True
+
+    def end_input(self):
+        self.in_focus = False
+        # self.settings[self.field] = self.text
+
+    def draw(self, win: pygame.Surface):
+        n = Display.name(self.prompt + self.text)
+        if self.in_focus:
+            txt_f = Display.name(self.prompt)
+            _x, _y = (self.x + txt_f.get_width(), self.y + n.get_height())
+            pygame.draw.line(win, Colors.BLACK.value,
+                             (_x, _y),
+                             (_x + n.get_width() - txt_f.get_width(), _y),
+                             3)
+        win.blit(n, (self.x, self.y))
 
 
 class MainMenu:
     BG = (255, 255, 255)
 
-    def __init__(self):
-        self.name = ""
+    def __init__(self, user_reset: bool, restore_from_default: bool):
+        # self.name = ""
         self.waiting = False
         Display.init()
         self.surface = Display.surface()
+        self.controls: [InputText] = []
+        self.cur_input_field = 0
+        if not os.path.exists(DEFAULT_SETTINGS_FILE):
+            Path(os.path.dirname(DEFAULT_SETTINGS_FILE)).mkdir(mode=0o755, parents=True, exist_ok=True)
+            try:
+                with open(DEFAULT_SETTINGS_FILE, 'w') as fp:
+                    yaml.safe_dump(SETTINGS_TEMPLATE, fp)
+            except FileNotFoundError as ffe:
+                log("INIT ERROR: ", ffe)
+        if not os.path.exists(SETTINGS_FILE):
+            try:
+                with open(SETTINGS_FILE, 'w') as fp:
+                    yaml.safe_dump(SETTINGS_TEMPLATE, fp)
+            except FileNotFoundError as ffe:
+                log("INIT ERROR: ", ffe)
+
+        if restore_from_default:
+            try:
+                with open(DEFAULT_SETTINGS_FILE, 'r') as d_fp:
+                    with open(SETTINGS_FILE, 'w') as fp:
+                        yaml.safe_dump(yaml.safe_load(d_fp), fp)
+            except FileNotFoundError as ffe:
+                log("INIT ERROR: ", ffe)
+
+        with open(SETTINGS_FILE) as file:
+            try:
+                self.game_settings = dict(yaml.safe_load(file))
+                if user_reset:
+                    self.game_settings['user_defaults'] = {}
+            except yaml.YAMLError as exc:
+                log("settings.yaml error ", exc)
+                pygame.quit()
+        self.create_screen_layout()
+
+    def create_screen_layout(self):
+        self.controls.append(InputText(200, 400,
+                                       "Type a Name: ",
+                                       "",
+                                       in_focus=True))
+        self.controls.append(InputText(200, 600,
+                                       "Connect to Server: ",
+                                       self.game_settings['server_defaults']['ip']))
 
     def draw(self):
         self.surface.fill(self.BG)
         display_width, display_height = Display.dims()
         title = Display.title("Welcome to BuyGame !")
         self.surface.blit(title, (display_width / 2 - title.get_width() / 2, 50))
-        name = Display.name("Type a Name: " + self.name)
-        self.surface.blit(name, (100, 400))
+        # name = Display.name("Type a Name: " + self.name)
+        # self.surface.blit(name, (100, 400))
+        for _c in self.controls:
+            _c.draw(self.surface)
+
         if self.waiting:
             enter = Display.enter_prompt("In Queue...")
             self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
@@ -39,6 +135,7 @@ class MainMenu:
     def run(self):
         run = True
         clock = pygame.time.Clock()
+        from gui.base import GameUI
         g: GameUI = None
         logger.reset()
         while run:
@@ -49,7 +146,7 @@ class MainMenu:
                 # if response:
                 #     run = False
                 log("creating GameUI")
-                g = GameUI(self.name)
+                g = GameUI(self)
                 # for player in response:
                 # p = PlayerGUI(player)
                 # g.players.append(p)
@@ -64,30 +161,56 @@ class MainMenu:
                     Display.resize(event, g.refresh_resolution) if g is not None else None
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
-                        if len(self.name) > 1:
+                        self.controls[self.cur_input_field].end_input()
+                        self.cur_input_field += 1
+                        if self.cur_input_field >= len(self.controls):
                             self.waiting = True
-                            log("marking end of name entry")
-                            # self.n = Network(self.name)
+                            log(f"marking end of field entry(s) {self.controls[0].text} {self.controls[1].text}")
+                            continue
+                        self.controls[self.cur_input_field].begin_input()
+                        # self.n = Network(self.name)
                     else:
                         # gets the key name
                         key_name = pygame.key.name(event.key)
                         # converts to uppercase the key name
                         key_name = key_name.lower()
-                        self.type(key_name)
+                        self.controls[self.cur_input_field].type(key_name)
 
-    def type(self, char):
-        if char == "backspace":
-            if len(self.name) > 0:
-                self.name = self.name[:-1]
-        elif char == "space":
-            self.name += " "
-        elif len(char) == 1:
-            self.name += char
+        self.save_gamesettings()
 
-        if len(self.name) >= MAX_NAME_LENGTH:
-            self.name = self.name[:MAX_NAME_LENGTH]
+    def save_gamesettings(self):
+        with open(SETTINGS_FILE, 'w') as fp:
+            yaml.safe_dump(self.game_settings, fp)
 
 
 if __name__ == "__main__":
-    main = MainMenu()
+    _reset: bool = False
+    _restore: bool = False
+    user = server = ""
+    import re
+    for i in range(len(sys.argv)):
+        if re.match("-ur|--user-reset", sys.argv[i].lower().strip()):
+            # log("SB: user-reset")
+            _reset = True
+        if re.match("-rs|--restore", sys.argv[i].lower().strip()):
+            # log("SB: restore")
+            _restore = True
+        if re.match("-u[\b]*|--user=", sys.argv[i].lower().strip()):
+            if sys.argv[i].strip() == "-u":
+                i += 1 if i < len(sys.argv) - 1 else 0
+                user = sys.argv[i]
+            else:
+                user = str(sys.argv[i]).split('=')[1]
+
+        if re.match("-s[\b]*|--server=", sys.argv[i].lower().strip()):
+            if sys.argv[i].strip() == "-s":
+                i += 1 if i < len(sys.argv) - 1 else 0
+                server = sys.argv[i]
+            else:
+                server = str(sys.argv[i]).split('=')[1]
+            # log(f"SB: Matched user arg {val}")
+
+    main = MainMenu(_reset, _restore)
+    main.controls[0].set_text(user if len(user) > 0 else None)
+    main.controls[1].set_text(server if len(server) > 0 else None)
     main.run()

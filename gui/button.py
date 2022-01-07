@@ -24,7 +24,7 @@ class Button(Display):
         self.border_color = border_color
         self.BORDER_WIDTH = 2
         self.on_display = on_display
-        self.clear_on_next_draw = False
+        self.cleared = False
 
     def refresh_dims(self):
         pass
@@ -34,22 +34,21 @@ class Button(Display):
         if set_border:
             self.border_color = self.fill_color
 
+    def get_color(self):
+        return self.fill_color
+
     def draw(self, win):
-        if not self.on_display:
-            if not self.clear_on_next_draw:
-                # we have already cleared when button not in display
-                return
-            bc = self.bg_color.value
-            fc = self.bg_color.value
-            self.clear_on_next_draw = False
-        else:
+        if self.on_display:
             bc = self.border_color.value
             fc = self.fill_color.value
+        elif not self.cleared:
+            self.cleared = True
+            bc = self.bg_color.value
+            fc = self.bg_color.value
+        else:
+            return
         pygame.draw.rect(win, fc, (self.x, self.y, self.width, self.height), 0)
         pygame.draw.rect(win, bc, (self.x, self.y, self.width, self.height), 1)
-        # pygame.draw.rect(win, fc, (
-        #     self.x + self.BORDER_WIDTH, self.y + self.BORDER_WIDTH, self.width - self.BORDER_WIDTH * 2,
-        #     self.height - self.BORDER_WIDTH * 2), 0)
 
     def click(self, x, y):
         """
@@ -58,6 +57,8 @@ class Button(Display):
         :param y: float
         :return: bool
         """
+        if not self.on_display:
+            return False
 
         if self.x <= x <= self.x + self.width and self.y <= y <= self.y + self.height:
             return True  # user clicked button
@@ -66,30 +67,45 @@ class Button(Display):
 
     def show(self):
         self.on_display = True
-        self.clear_on_next_draw = False
+        self.cleared = False
 
     def hide(self):
         self.on_display = False
-        self.clear_on_next_draw = True
+        self.cleared = False
 
 
 class TextButton(Button):
     def __init__(self, x, y, width, height, fill_color: Colors, text, border_color: Colors = Colors.BLACK):
         super().__init__(x, y, width, height, fill_color=fill_color, border_color=border_color)
         self.text = text
+        self.render_txt = self.text
         self.text_font = pygame.font.SysFont("comicsans", 30)
+        self.blink = False
+        self.blink_indicator_fps = 0
 
     def change_font_size(self, size):
         self.text_font = pygame.font.SysFont("comicsans", size)
 
     def set_text(self, text: str):
         self.text = text
+        self.render_txt = text
+
+    def set_blink(self, b):
+        self.blink = b
+        self.blink_indicator_fps = FPS if FPS > 30 else 30
+        self.render_txt = self.text if not b else ""
 
     def draw(self, win):
         super().draw(win)
         if not self.on_display:
             return
-        txt = self.text_font.render(self.text, 1, (0, 0, 0))
+        if self.blink:
+            if self.blink_indicator_fps == 0:
+                self.render_txt = self.text if len(self.render_txt) == 0 else ""
+                self.blink_indicator_fps = FPS if FPS > 30 else 30
+            else:
+                self.blink_indicator_fps -= 1
+        txt = self.text_font.render(self.render_txt, 1, (0, 0, 0))
         win.blit(txt, (self.x + self.width / 2 - txt.get_width() / 2, self.y + self.height / 2 - txt.get_height() / 2))
 
     def refresh_dims(self):
