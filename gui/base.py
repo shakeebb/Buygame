@@ -396,17 +396,11 @@ class GameUI:
         for n in self.me().notify_msg:
             if n.n_id <= self.last_notification_received:
                 continue
-            # if len(self.message_box.list) > 0:
-            #     last_item = self.message_box.list.__getitem__(len(self.message_box.list) - 1)
-            #     log(f"SB: length is {len(self.message_box.list)} {last_item[0]}")
-            #     if last_item is not None and last_item[0] == msg:
-            #         return
-            log(f"SB: adding notify {n.get_msg()}")
+            # log(f"SB: adding notify {n.get_msg()}")
             self.messagebox_notify(n.get_msg())
             last_notification = n
 
         if last_notification is not None:
-            log(f"SB: last seen message : {self.last_notification_received} {last_notification.n_id}")
             self.last_notification_received = last_notification.n_id
 
     def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK):
@@ -527,7 +521,6 @@ class GameUI:
                 diceMessage: str = ClientMsgReq.Dice.msg + diceValue
                 try:
                     self.set_game(self.network.send(diceMessage))
-                    log(f"SB: dice rolled to {diceValue}..... {self.me().get_temp_str()}")
                 except Exception as e:
                     log("dice roll notify failed", e)
 
@@ -553,7 +546,6 @@ class GameUI:
                                                                        self.client_notify,
                                                                        self.messagebox_notify)
                     self.set_game(_g_obj)
-                    log(f"SB: BUY status {self.game_status} expected BOUGHT|BUY_FAILED")
                 except Exception as e:
                     log("buy failed", e)
 
@@ -562,7 +554,6 @@ class GameUI:
                                                                     self.server_notify,
                                                                     self.client_notify)
                 self.set_game(_g_obj)
-                log(f"SB: BUY_CANCEL status {self.game_status}")
             else:
                 self.bottom_bar.hide_all()
 

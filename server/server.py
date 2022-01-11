@@ -107,7 +107,7 @@ class Server:
         assert _cs.player.game.id == game.id
         # c is socket
         stringp = str(_cs.player.number)
-        log(f"ready to process messages from {stringp}")
+        log(f"ready to process messages")
         p = serialize(ObjectType.MESSAGE, stringp)
         decodedP = int(p.decode('utf-8')[-1])
         # _cs.socket.send(p)
@@ -120,7 +120,7 @@ class Server:
                     time.sleep(1)
                     continue
                 if VERBOSE:
-                    log(f"received message payload [{payload}] from Player {decodedP}")
+                    log(f"received message payload [{payload}]")
                 with game.game_mutex:
                     self.handle_client_msg(_cs, decodedP, game, payload)
             except Exception as e:

@@ -104,9 +104,15 @@ class MainMenu:
         self.create_screen_layout()
 
     def create_screen_layout(self):
+        def_usr = ""
+        # if we have exactly one user, its safe to assume it.
+        num_usrs = self.game_settings['user_defaults'].keys()
+        if num_usrs.__len__() == 1:
+            def_usr = num_usrs.__iter__().__next__()
+
         self.controls.append(InputText(200, 400,
                                        "Type a Name: ",
-                                       "",
+                                       def_usr,
                                        in_focus=True))
         self.controls.append(InputText(200, 600,
                                        "Connect to Server: ",
@@ -190,10 +196,8 @@ if __name__ == "__main__":
     import re
     for i in range(len(sys.argv)):
         if re.match("-ur|--user-reset", sys.argv[i].lower().strip()):
-            # log("SB: user-reset")
             _reset = True
         if re.match("-rs|--restore", sys.argv[i].lower().strip()):
-            # log("SB: restore")
             _restore = True
         if re.match("-u[\b]*|--user=", sys.argv[i].lower().strip()):
             if sys.argv[i].strip() == "-u":
@@ -208,7 +212,6 @@ if __name__ == "__main__":
                 server = sys.argv[i]
             else:
                 server = str(sys.argv[i]).split('=')[1]
-            # log(f"SB: Matched user arg {val}")
 
     main = MainMenu(_reset, _restore)
     main.controls[0].set_text(user if len(user) > 0 else None)
