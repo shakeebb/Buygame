@@ -136,7 +136,7 @@ class ClientUtils:
         # time.sleep(1)
         player: Player = game.players()[number]
         serverMessage = game.get_server_message()
-        if player.sell_check:
+        if player.txn_status:
             notify_srv_msg(f"{serverMessage} ")
             if ClientResp.Sold.msg in serverMessage:
                 ret_status = GameUIStatus.SOLD

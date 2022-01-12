@@ -13,12 +13,12 @@ class ClientSocket:
         self.thread_name: str = ""
 
     def __repr__(self):
-        return f"{self.player.game.id}-{self.player.name}-{self.player.number}"
+        return f"{self.player.game.game_id}-{self.player.name}-{self.player.number}"
 
     def post_handshake(self, g_id: int, player: Player):
-        assert player.game.id == g_id
+        assert player.game.game_id == g_id
         self.player = player
-        self.thread_name = f"{self.player.name}-{self.player.number}-{self.player.game.id}"
+        self.thread_name = f"{self.player.name}-{self.player.number}-{self.player.game.game_id}"
 
     def set_last_active_ts(self):
         self.last_hb_received = datetime.now()

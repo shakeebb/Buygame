@@ -6,11 +6,12 @@ import sys
 from pathlib import Path
 
 import pygame
-from pygame.event import Event
 from pygame.locals import *
 
-from common.gameconstants import MAX_NAME_LENGTH, SETTINGS_FILE, SETTINGS_TEMPLATE, Colors, DEFAULT_SETTINGS_FILE
+from common.gameconstants import MAX_NAME_LENGTH, CLIENT_SETTINGS_FILE, CLIENT_SETTINGS_TEMPLATE, Colors, \
+    CLIENT_DEFAULT_SETTINGS_FILE
 from common.logger import log, logger
+from common.utils import write_file
 from gui.display import Display
 import yaml
 
@@ -71,29 +72,21 @@ class MainMenu:
         self.surface = Display.surface()
         self.controls: [InputText] = []
         self.cur_input_field = 0
-        if not os.path.exists(DEFAULT_SETTINGS_FILE):
-            Path(os.path.dirname(DEFAULT_SETTINGS_FILE)).mkdir(mode=0o755, parents=True, exist_ok=True)
-            try:
-                with open(DEFAULT_SETTINGS_FILE, 'w') as fp:
-                    yaml.safe_dump(SETTINGS_TEMPLATE, fp)
-            except FileNotFoundError as ffe:
-                log("INIT ERROR: ", ffe)
-        if not os.path.exists(SETTINGS_FILE):
-            try:
-                with open(SETTINGS_FILE, 'w') as fp:
-                    yaml.safe_dump(SETTINGS_TEMPLATE, fp)
-            except FileNotFoundError as ffe:
-                log("INIT ERROR: ", ffe)
+
+        write_file(CLIENT_DEFAULT_SETTINGS_FILE, lambda _f:
+                   yaml.safe_dump(CLIENT_SETTINGS_TEMPLATE, _f))
+        write_file(CLIENT_SETTINGS_FILE, lambda _f:
+                   yaml.safe_dump(CLIENT_SETTINGS_TEMPLATE, _f))
 
         if restore_from_default:
             try:
-                with open(DEFAULT_SETTINGS_FILE, 'r') as d_fp:
-                    with open(SETTINGS_FILE, 'w') as fp:
-                        yaml.safe_dump(yaml.safe_load(d_fp), fp)
+                with open(CLIENT_DEFAULT_SETTINGS_FILE, 'r') as d_fp:
+                    write_file(CLIENT_SETTINGS_FILE, lambda _f:
+                               yaml.safe_dump(yaml.safe_load(d_fp), _f))
             except FileNotFoundError as ffe:
                 log("INIT ERROR: ", ffe)
 
-        with open(SETTINGS_FILE) as file:
+        with open(CLIENT_SETTINGS_FILE) as file:
             try:
                 self.game_settings = dict(yaml.safe_load(file))
                 if user_reset:
@@ -185,7 +178,7 @@ class MainMenu:
         self.save_gamesettings()
 
     def save_gamesettings(self):
-        with open(SETTINGS_FILE, 'w') as fp:
+        with open(CLIENT_SETTINGS_FILE, 'w') as fp:
             yaml.safe_dump(self.game_settings, fp)
 
 
@@ -213,11 +206,11 @@ def main():
             else:
                 server = str(sys.argv[i]).split('=')[1]
 
-    main = MainMenu(_reset, _restore)
-    main.controls[0].set_text(user if len(user) > 0 else None)
-    main.controls[1].set_text(server if len(server) > 0 else None)
-    main.run()
+    _main = MainMenu(_reset, _restore)
+    _main.controls[0].set_text(user if len(user) > 0 else None)
+    _main.controls[1].set_text(server if len(server) > 0 else None)
+    _main.run()
+
 
 if __name__ == "__main__":
-   main()
-
+    main()

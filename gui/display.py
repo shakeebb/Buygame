@@ -13,11 +13,13 @@ def get_tile_sz(_w, _h, sz):
 
 def within_max_limits(p_h_c, p_v_c, p_tile_sz):
     # return 45 <= p_h_c <= 120 and 25 <= p_v_c <= 70 and 8 < p_tile_sz < 128
-    return p_h_c <= 120 and p_v_c <= 70 and p_tile_sz <= 1028
+    # return p_h_c <= 120 and p_v_c <= 70 and p_tile_sz <= 1028
+    return p_h_c <= 500 and p_v_c <= 250 and p_tile_sz <= 1028
 
 
 def above_min_limits(p_h_c, p_v_c, p_tile_sz):
-    return 52 <= p_h_c and 29 <= p_v_c and 10 <= p_tile_sz
+    # return 52 <= p_h_c and 29 <= p_v_c and 10 <= p_tile_sz
+    return 52 <= p_h_c and 29 <= p_v_c and 8 <= p_tile_sz
 
 
 class Display(pygame.sprite.Sprite):
@@ -26,8 +28,8 @@ class Display(pygame.sprite.Sprite):
 
     class __disp__:
         def __init__(self):
-            self.WIDTH = 1300
-            self.HEIGHT = 1080
+            self.WIDTH = 800
+            self.HEIGHT = 600
             dis_info = pygame.display.Info()  # You have to call this before pygame.display.set_mode()
             self.monitor_size = (dis_info.current_w, dis_info.current_h)
             self.window = pygame.display.set_mode((int(self.monitor_size[0] * 0.96), int(self.monitor_size[1] * 0.89)),
@@ -35,15 +37,15 @@ class Display(pygame.sprite.Sprite):
             self.win_w = self.window.get_width()
             self.win_h = self.window.get_height()
             # self.window = pygame.display.set_mode((self.WIDTH, self.HEIGHT), FULLSCREEN)
-            # self.surface = pygame.Surface([self.WIDTH, self.HEIGHT])
             self.surface = self.window
+            # self.surface = pygame.Surface([self.WIDTH, self.HEIGHT])
             print("screen %s x %s , window %s x %s, surface %s x %s" %
                   (
                       self.monitor_size[0], self.monitor_size[1],
                       self.window.get_width(), self.window.get_height(),
                       self.surface.get_width(), self.surface.get_height()
                   ))
-            self.surface.fill(BG_COLOR)
+            self.surface.fill(BG_COLOR.value)
             self.name_font = pygame.font.SysFont("comicsans", 80)
             self.title_font = pygame.font.SysFont("comicsans", 120)
             self.enter_font = pygame.font.SysFont("comicsans", 60)
@@ -58,9 +60,14 @@ class Display(pygame.sprite.Sprite):
                 if within_max_limits(self.num_h_cells, self.num_v_cells, Display.TILE_SIZE) \
                         and above_min_limits(self.num_h_cells, self.num_v_cells, Display.TILE_SIZE):
                     break
-                Display.TILE_SIZE -= 2
+                Display.TILE_SIZE += 2
                 self.num_h_cells, self.num_v_cells = get_tile_sz(self.win_w, self.win_h, Display.TILE_SIZE)
 
+            print("The grid h x v cells are %s x %s, TILE_SIZE=%s TILE_SIZE_MULTIPLIER=%s" %
+                  (
+                      self.num_h_cells, self.num_v_cells,
+                      INIT_TILE_SIZE, TILE_ADJ_MULTIPLIER
+                  ))
             self.grid = [[0 for _ in range(self.num_h_cells)] for _ in range(self.num_v_cells)]
 
         def compute_display_grid(self, p_w, p_h):
@@ -112,6 +119,7 @@ class Display(pygame.sprite.Sprite):
         # frame = pygame.transform.scale(cls.__i.surface, (cls.__i.window.get_width(), cls.__i.window.get_height()))
         # cls.__i.window.blit(frame, frame.get_rect())
         # cls.__i.window.blit(cls.__i.surface, Display.dims())
+        cls.__i.window.blit(pygame.transform.scale(cls.__i.surface, (cls.__i.win_w, cls.__i.win_h)), (0, 0))
         pygame.display.flip()
 
     @classmethod

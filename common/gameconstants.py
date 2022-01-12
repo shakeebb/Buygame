@@ -7,7 +7,8 @@ from pathlib import Path
 LOG = True
 VERBOSE = False
 
-INIT_TILE_SIZE = 32
+INIT_TILE_SIZE = 16
+TILE_ADJ_MULTIPLIER = 2
 DISPLAY_TILE_GRID = False
 DISPLAY_TILE_GRID_OUTPUT = False
 
@@ -18,9 +19,9 @@ MAX_RECONNECT_TIME = 16
 WILD_CARD = "*"
 MAX_LETTERS_ON_HOLD = 8
 
-DEFAULT_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/.default_settings.yaml')
-SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/settings.yaml')
-SETTINGS_TEMPLATE = {
+CLIENT_DEFAULT_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/.default_settings.yaml')
+CLIENT_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/settings.yaml')
+CLIENT_SETTINGS_TEMPLATE = {
     "server_defaults": {
         "ip": "23.239.14.203",
         "port": "1234"
@@ -31,8 +32,20 @@ SETTINGS_TEMPLATE = {
     }
 }
 
-FPS = 30  # frames per second, the general speed of the program
+SERVER_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/server_settings.yaml')
+SERVER_SETTINGS_TEMPLATE = {
+    "server_settings": {
+        "bind_ip": "0.0.0.0",
+        "port": "36909"
+    }
+    ,
+    "game_settings": {
+        "last_id": "",
+    }
+}
 
+FPS = 30  # frames per second, the general speed of the program
+MAX_RETRY = 5
 
 # WINDOWWIDTH = 800 # size of window's width in pixels
 # WINDOWHEIGHT = 600 # size of windows' height in pixels
@@ -71,7 +84,7 @@ class Align(Flag):
     CENTER = auto()
 
 
-BG_COLOR = Colors.WHITE.value
+BG_COLOR = Colors.WHITE
 MAX_NAME_LENGTH = 10
 FONT_SIZE = 25
 FONT_NAME = "comicsans"

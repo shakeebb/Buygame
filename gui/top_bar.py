@@ -27,7 +27,8 @@ class TopBar(Display):
         self.refresh_dims()
         self.connection_button = TextButton(self.xmargin() - 7,
                                             self.v_margin_cells + int(self.height_cells / 2) - 1,
-                                            3, 2, Colors.YELLOW, "Init",
+                                            3*TILE_ADJ_MULTIPLIER, 2,
+                                            Colors.YELLOW, "Init",
                                             Colors.YELLOW)
         self.connection_button.change_font_size(15)
         self.server_msg = Label(self.xmargin() - 20,
@@ -36,7 +37,8 @@ class TopBar(Display):
                                 Align.RIGHT, 15)
         self.client_msgs = MessageList(self.h_margin_cells + self.width_cells - 19.5,
                                        self.v_margin_cells + 0.5,
-                                       12, 3,
+                                       12*TILE_ADJ_MULTIPLIER,
+                                       3 * TILE_ADJ_MULTIPLIER,
                                        5, 15)
 
     def draw(self, win):

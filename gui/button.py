@@ -140,22 +140,29 @@ class RadioButton(Button):
     class Option:
         def __init__(self, radio, x, y, idnum, caption=""):
             self.rb: RadioButton = radio
-            self.x = x + (INIT_TILE_SIZE/4)
-            self.y = y + (idnum * INIT_TILE_SIZE) + (INIT_TILE_SIZE/4)
+            self.x = x + (INIT_TILE_SIZE/(4*TILE_ADJ_MULTIPLIER))
+            self.y = y + (idnum * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE) + (INIT_TILE_SIZE/(4*TILE_ADJ_MULTIPLIER))
             self.caption = caption
             self.checked = False
-            self.checkbox_obj = pygame.Rect(self.x, self.y, 12, 12)
+            self.checkbox_obj = pygame.Rect(self.x, self.y,
+                                            12,
+                                            12)
             self.checkbox_outline = self.checkbox_obj.copy()
             self.idnum = idnum
 
         def render(self, surface):
+            offset = 6 * TILE_ADJ_MULTIPLIER
             if self.checked:
-                pygame.draw.circle(surface, self.rb.border_color.value, (self.x + 6, self.y + 6), 5)
-                pygame.draw.circle(surface, self.rb.check_color.value, (self.x + 6, self.y + 6), 4)
+                pygame.draw.circle(surface, self.rb.border_color.value, (self.x + offset, self.y + offset),
+                                   5)
+                pygame.draw.circle(surface, self.rb.check_color.value, (self.x + offset, self.y + offset),
+                                   4)
 
             elif not self.checked:
-                pygame.draw.circle(surface, self.rb.border_color.value, (self.x + 6, self.y + 6), 5)
-                pygame.draw.circle(surface, self.rb.fill_color.value, (self.x + 6, self.y + 6), 4)
+                pygame.draw.circle(surface, self.rb.border_color.value, (self.x + offset, self.y + offset),
+                                   5)
+                pygame.draw.circle(surface, self.rb.fill_color.value, (self.x + offset, self.y + offset),
+                                   4)
             self._draw_button_text(surface)
 
         def _draw_button_text(self, surface):

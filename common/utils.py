@@ -1,8 +1,12 @@
+import os
 import pickle
 import socket
 import time
 from enum import Enum, auto
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from common.gameconstants import STD_HEADER_LENGTH
 from common.logger import log
@@ -28,7 +32,7 @@ def get_std_hdr(o, m):
 
 
 def parse_std_hdr(header) -> (ObjectType, int):
-    if not len(header):
+    if len(header) <= 0:
         return None, 0
     return ObjectType.parse_msg_string(int(header[:2])), int(header[2:])
 
@@ -59,7 +63,7 @@ def receive_pickle(client_socket):
         message_length = 0
         msg_type: ObjectType = ObjectType.NONE
         while message_length == 0:
-            msg_type, message_length = parse_std_hdr(client_socket.recv(STD_HEADER_LENGTH))
+            msg_type, message_length = parse_std_hdr(recvall(client_socket, STD_HEADER_LENGTH))
             if msg_type is None:
                 return False
         assert msg_type == ObjectType.OBJECT
@@ -79,7 +83,7 @@ def receive_message(client_socket, block: bool = False):
         message_length = 0
         msg_type: ObjectType = ObjectType.NONE
         while message_length == 0:
-            msg_type, message_length = parse_std_hdr(client_socket.recv(STD_HEADER_LENGTH))
+            msg_type, message_length = parse_std_hdr(recvall(client_socket, STD_HEADER_LENGTH))
             if not block and msg_type is None:
                 return False
             # time.sleep(0.001)
@@ -99,7 +103,18 @@ def recvall(sock, size):
         received = sock.recv(min(remaining, buf_size), socket.MSG_WAITALL)
         # print(f"len(received) {len(received)} remaining {remaining}")
         if not received:
-            raise Exception('unexpected EOF')
+            raise Exception('unexpected EOF. Possibly client connection is closed ?')
         received_chunks.append(received)
         remaining -= len(received)
     return b''.join(received_chunks)
+
+
+def write_file(file: str, writer=None):
+    try:
+        if not os.path.exists(file):
+            Path(os.path.dirname(file)).mkdir(mode=0o755, parents=True, exist_ok=True)
+            with open(file, 'w') as fp:
+                writer(fp)
+    except FileNotFoundError as ffe:
+        log("GAME INIT ERROR: ", ffe)
+        raise
