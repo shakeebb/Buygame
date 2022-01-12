@@ -189,7 +189,7 @@ class MainMenu:
             yaml.safe_dump(self.game_settings, fp)
 
 
-if __name__ == "__main__":
+def main():
     _reset: bool = False
     _restore: bool = False
     user = server = ""
@@ -217,3 +217,7 @@ if __name__ == "__main__":
     main.controls[0].set_text(user if len(user) > 0 else None)
     main.controls[1].set_text(server if len(server) > 0 else None)
     main.run()
+
+if __name__ == "__main__":
+   main()
+
