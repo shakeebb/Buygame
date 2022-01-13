@@ -20,13 +20,13 @@ class BottomBar(Display):
         self.BORDER_THICKNESS = 5
         from gui.base import GameUI
         self.game: GameUI = game
-        button_features = (5, 1.5, Colors.DARK_GRAY)
+        button_features = (5 * TILE_ADJ_MULTIPLIER, 1.5 * TILE_ADJ_MULTIPLIER, Colors.DARK_GRAY)
         # self.backtome = TextButton(h_margin_cells + 1,
         #                            v_margin_cells + 1, *button_features, " Return ",
         #                            Colors.ORANGE)
         equal_parts = width_cells // 4
         button_h_pos = equal_parts * 1.7
-        button_v_pos = self.v_margin_cells - 5
+        button_v_pos = self.v_margin_cells - (5 * TILE_ADJ_MULTIPLIER)
         controls = [[(" Roll ", -9, 1), (" Cancel ", -5 + 4, 1)],
                     [("Create", -9, 3), (" Chat ", -5, 3)]
                     ]
@@ -41,7 +41,8 @@ class BottomBar(Display):
 
         self.option_button = RadioButton(self.h_margin_cells + (button_h_pos * 1.4),
                                          button_v_pos - 1.5,
-                                         2, 4.3, on_display=False)
+                                         2 * TILE_ADJ_MULTIPLIER, 4.3 * TILE_ADJ_MULTIPLIER,
+                                         on_display=False)
         self.option_button.add_option("2")
         self.option_button.add_option("3")
         self.option_button.add_option("4")
@@ -107,7 +108,10 @@ class BottomBar(Display):
             # thorpy.launch_blocking_choices("Help!\n",
             #                                choices)
             if not self.dice:
-                self.dice = Dice(self.game, 200, 200, 100, 0.2)
+                self.dice = Dice(self.game,
+                                 self.help_button.x - (4 * INIT_TILE_SIZE * TILE_ADJ_MULTIPLIER),
+                                 self.help_button.y,
+                                 100, 0.2)
                 self.dice.draw()
                 self.dice.roll(self.rand.randint(5, 15))
                 return

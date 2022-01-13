@@ -20,12 +20,14 @@ import pandas as pd
 # Creating a TCP socket
 # AF_INET means IPV4
 # SOCK_STREAM means TCP
+import yaml
+
 from common.game import *
 from common.gameconstants import *
 from common.logger import log
 from datetime import datetime
 
-from common.utils import serialize, deserialize, receive_message, ObjectType
+from common.utils import serialize, deserialize, receive_message, ObjectType, write_file
 from server.socket import ClientSocket
 
 script_path = os.path.dirname(os.path.abspath(__file__))
@@ -59,6 +61,9 @@ class Server:
         self.gameId = 0
         self.number_of_usr = 0
         self.cleanup_interval = Event()
+        write_file(SERVER_SETTINGS_FILE, lambda _f:
+                   yaml.safe_dump(SERVER_SETTINGS_TEMPLATE, _f))
+        self.handshake_lock = RLock()
 
     def main(self):
         # Waiting for players to join lobby and to start game
@@ -72,27 +77,28 @@ class Server:
 
             while True:
                 client_socket, client_address = self.server_socket.accept()
-                client_socket.setblocking(True)
-                # adding client socket to list of users
-                log(f"[CONNECTION] {client_address} connected!")
-                cs = ClientSocket(client_socket)
-                g, player, new_session_id = self.handshake(cs)
-                cs.post_handshake(g.id, player)
-                self.client_sockets_list.append(cs)
-                # always send the game object as response and then may be other responses.
-                cs.socket.sendall(serialize(ObjectType.OBJECT, g))
-                log(f"game sent to client. new session id {new_session_id}")
-                cs.socket.sendall(serialize(ObjectType.MESSAGE, new_session_id))
-                # cs.socket.sendall(create_pickle(g))
-                log("handshake complete")
-                # sending game to player
-                # start_new_thread(self.threaded, (cs, self.gameId))
-                ct = threading.Thread(target=self.threaded, args=(cs, g),
-                                      name=cs.thread_name,
-                                      daemon=False)
-                ct.start()
-                self.threads_list.append(ct)
-                self.number_of_usr += 1
+                with self.handshake_lock:
+                    client_socket.setblocking(True)
+                    # adding client socket to list of users
+                    log(f"[CONNECTION] {client_address} connected!")
+                    cs = ClientSocket(client_socket)
+                    g, player = self.handshake(cs)
+                    cs.post_handshake(g.game_id, player)
+                    self.client_sockets_list.append(cs)
+                    # always send the game object as response and then may be other responses.
+                    cs.socket.sendall(serialize(ObjectType.OBJECT, g))
+                    log(f"game sent to client with session id {[player.session_id]}")
+                    cs.socket.sendall(serialize(ObjectType.MESSAGE, player.session_id))
+                    # cs.socket.sendall(create_pickle(g))
+                    log("handshake complete")
+                    # sending game to player
+                    # start_new_thread(self.threaded, (cs, self.gameId))
+                    ct = threading.Thread(target=self.threaded, args=(cs, g),
+                                          name=cs.thread_name,
+                                          daemon=False)
+                    ct.start()
+                    self.threads_list.append(ct)
+                    self.number_of_usr += 1
         finally:
             self.cleanup_interval.set()
             for _cs in self.client_sockets_list:
@@ -104,13 +110,14 @@ class Server:
             self.server_socket.close()
 
     def threaded(self, _cs: ClientSocket, game: Game):
-        assert _cs.player.game.id == game.id
+        assert _cs.player.game.game_id == game.game_id
         # c is socket
         stringp = str(_cs.player.number)
         log(f"ready to process messages")
         p = serialize(ObjectType.MESSAGE, stringp)
         decodedP = int(p.decode('utf-8')[-1])
         # _cs.socket.send(p)
+        continuous_retries = MAX_RETRY
         while _cs.is_active:
             try:
                 # data received from client
@@ -118,9 +125,14 @@ class Server:
                 if payload is None or (isinstance(payload, bool) and not bool(payload)):
                     # slow down the next STREAM SOCKET read
                     time.sleep(1)
+                    continuous_retries -= 1
+                    if continuous_retries <= 0:
+                        log(f"{MAX_RETRY} reached, {_cs} socket unreachable.")
+                        _cs.mark_inactive()
                     continue
                 if VERBOSE:
                     log(f"received message payload [{payload}]")
+                continuous_retries = MAX_RETRY
                 with game.game_mutex:
                     self.handle_client_msg(_cs, decodedP, game, payload)
             except Exception as e:
@@ -215,7 +227,7 @@ class Server:
         elif ClientMsgReq.Dice == client_req:
             diceValue = int(data)
             log(f"diceValue is {diceValue}")
-            game.player_rolled(diceValue)
+            game.player_rolled(_cs.player, diceValue)
             game.set_server_message(ClientResp.Racks_Ready.msg)
 
         elif ClientMsgReq.Get == client_req:
@@ -247,25 +259,23 @@ class Server:
         elif ClientMsgReq.Sell == client_req:
             try:
                 word = data
-                ret_val = _cs.player.sell(word, self.word_dict_csv)
-                if _cs.player.sell_check:
-                    if ret_val == GameState.SELL:
+                _cs.player.sell(word, self.word_dict_csv)
+                if _cs.player.txn_status == Txn.SOLD_SELL_AGAIN:
                         game.set_server_message(f"{ClientResp.Sold_Sell_Again.msg} word={word}")
-                    else:
-                        game.set_server_message(f"{ClientResp.Sold.msg} word={word}")
-                else:
+                elif _cs.player.txn_status == Txn.SOLD:
+                    game.set_server_message(f"{ClientResp.Sold.msg} word={word}")
+                elif _cs.player.txn_status == Txn.SELL_FAILED:
                     game.set_server_message(f"{ClientResp.Sell_Failed.msg} word={word}")
             except Exception as e:
                 log(f"{game} {_cs.player} sell failed", e)
 
         elif ClientMsgReq.Cancel_Sell == client_req:
-            if _cs.player.get_remaining_letters() > 0:
+            _cs.player.cancel_sell()
+            if _cs.player.txn_status == Txn.SELL_CANCELLED_SELL_AGAIN:
                 game.set_server_message(f"{ClientResp.Sell_Cancelled_Sell_Again.msg}"
                                         f" Player {decoded_p}")
-                game.player_sold(_cs.player, True)
-            else:
+            elif _cs.player.txn_status == Txn.SELL_CANCELLED:
                 game.set_server_message(f"{ClientResp.Sell_Cancelled.msg} Player {decoded_p}")
-                game.player_sold(_cs.player, True)
         """# %%
         elif ClientMsgReq.Is_Done == client_req:
             round_enquiry = int(data)
@@ -292,10 +302,13 @@ class Server:
         log(f"serverMessage: {serverMessage} ")
         _cs.socket.sendall(serialize(ObjectType.OBJECT, game))
         _cs.set_last_active_ts()
+        # game.set_server_message(" ")
 
     def handshake(self, cs: ClientSocket):
         while True:
             payload = receive_message(cs.socket, True)
+            if not bool(payload):
+                continue
             log(f"handshake: received msg: {payload}")
             (msg_enum, data) = payload.split(':')
             client_req: ClientMsgReq = ClientMsgReq.parse_msg_string(msg_enum + ':')
@@ -323,7 +336,7 @@ class Server:
 
             g = None
             for _g in self.games:
-                if _g.id == game_id and _g.begin_time == begin_time:
+                if _g.game_id == game_id and _g.begin_time == begin_time:
                     g = _g
                     break
 
@@ -351,12 +364,12 @@ class Server:
                     typed_g.add_player(player_id, player)
                     log(f"attaching new player {player} to an existing game {unpaired_game}")
                     g = typed_g
-                    game_id = typed_g.id
+                    game_id = typed_g.game_id
                     begin_time = typed_g.begin_time
                 else:
                     self.gameId = self.gameId + 1
-                    g = Game(self.gameId, self.GAMETILES)
-                    game_id = g.id
+                    g = Game(self.gameId, self.GAMETILES, script_path)
+                    game_id = g.game_id
                     begin_time = g.begin_time
                     log(f"created a new game.... {g}")
                     self.games.append(g)
@@ -371,6 +384,7 @@ class Server:
             else:
                 assert isinstance(g, Game)
                 player = g.player_joined(player_id, team_id)
+                assert player.session_id == str(data)
                 log(f"resuming for player {player} in an existing game {g}")
 
             def create_session_id():
@@ -378,7 +392,8 @@ class Server:
                            f"[{player_name}]-[{begin_time}]")
 
             g.set_server_message(f"{player.name} handshake complete")
-            return g, player, create_session_id()
+            player.session_id = create_session_id()
+            return g, player
 
 
 if __name__ == '__main__':

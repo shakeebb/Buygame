@@ -48,53 +48,84 @@ class GameUI:
 
         self.surface = Display.surface()
 
-        self.top_bar = TopBar(0.5, 0.5, Display.num_horiz_cells() - 1, 4)
-        self.leaderboard = Leaderboard(0.5, self.top_bar.ymargin() + 1, 5, 10)
-        self.message_box = MessageList(Display.num_horiz_cells() - 10,
-                                       self.top_bar.ymargin() + 0.5,
-                                       10, 10,
+        xx = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [.5, 0, 0, 1, 1, 1, 0, 0, 0, 1],
+            [.5, 0, 1, 1, 1, 1, 1, 1, 0, 1],
+            [0, 0, 0, 0, 1, 0, 0, 0, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+        ]
+
+        self.top_bar = TopBar(0.5, 0.5,
+                              width_cells=Display.num_horiz_cells() - (1*TILE_ADJ_MULTIPLIER),
+                              height_cells=4 * TILE_ADJ_MULTIPLIER)
+
+        def h_percent(p: int):
+            return Display.num_horiz_cells() * (p*.01)
+
+        self.leaderboard = Leaderboard(0.5,
+                                       self.top_bar.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
+                                       width_cells=h_percent(5 * TILE_ADJ_MULTIPLIER),
+                                       height_cells=10 * TILE_ADJ_MULTIPLIER)
+
+        self.message_box = MessageList(Display.num_horiz_cells() - h_percent(10 * TILE_ADJ_MULTIPLIER),
+                                       self.top_bar.ymargin() + (0.5 * TILE_ADJ_MULTIPLIER),
+                                       width_cells=h_percent(10 * TILE_ADJ_MULTIPLIER),
+                                       height_cells=(10 * TILE_ADJ_MULTIPLIER),
                                        num_msgs=10, line_spacing=30, font_sz=18, bold_face=False,
                                        border_width=4, border_color=Colors.MAGENTA)
-        # self.board = Board(305,125)
-        self.temp_rack = Inventory(self.leaderboard.xmargin() + 11,
-                                   self.top_bar.ymargin() + 1,
-                                   self.message_box.h_margin_cells - 2,
-                                   2, 2.5, 1, 5, display_dollar_value=True,
+
+        def equalparts_point(p: float, parts: int, part_of_parts: float):
+            c = self.message_box.h_margin_cells - self.leaderboard.xmargin()
+            # - self.leaderboard.xmargin() \
+            # c = h_percent(p)
+            mid_horiz = (c / parts) * part_of_parts
+            # print(f"SB: horiz ({self.message_box.h_margin_cells} - {self.leaderboard.xmargin()}="
+            #       f"{c}, tf(({c} / {parts}) * {part_of_parts})={mid_horiz}")
+            # print(f"SB: horiz ({Display.num_horiz_cells()} * {p} * 0.01)="
+            #       f"{c}, tf(({c} / {parts}) * {part_of_parts})={mid_horiz}")
+            return mid_horiz
+
+        self.temp_rack = Inventory(self.leaderboard.xmargin() + equalparts_point(85, 8, 2),
+                                   self.top_bar.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
+                                   width_cells=-1,
+                                   height_cells=2 * TILE_ADJ_MULTIPLIER,
+                                   size=(2 * TILE_ADJ_MULTIPLIER),
+                                   rows=1, cols=5, display_dollar_value=True,
                                    border_color=Colors.LT_GRAY, box_color=Colors.WHITE)
 
-        self.inventory = Inventory(self.leaderboard.xmargin() + 5,
-                                   self.top_bar.ymargin() + 5,
-                                   self.message_box.h_margin_cells - 2,
-                                   2, 2.5, 1, 10, display_dollar_value=True,
+        self.inventory = Inventory(self.leaderboard.xmargin() + equalparts_point(85, 12, 1),
+                                   self.temp_rack.ymargin() + 2,
+                                   width_cells=-1,
+                                   height_cells=2 * TILE_ADJ_MULTIPLIER,
+                                   size=2 * TILE_ADJ_MULTIPLIER,
+                                   rows=1, cols=10, display_dollar_value=True,
                                    border_color=Colors.GRAY)
-        # self.inventory = Inventory((self.chat.h_margin_cells - self.leaderboard.xmargin()) / 2,
-        #                            self.top_bar.ymargin() + 4,
-        #                            24, 2.5, 75, 1, 10, Colors.GRAY.value)
-        # self.inventory = Inventory(self.leaderboard.xmargin(), display_height * 300 / 600,
-        # 75, 1, 10, Colors.GRAY.value)
-        # self.inventory = Inventory(display_width * 0.08, display_height * 300 / 600, 75, 1, 10, Colors.GRAY.value)
-        self.bag = Bag(self.leaderboard.xmargin() / 3, self.leaderboard.ymargin() + 1, 2)
-        # self.chat = Chat(display_width * 670 / 800, display_height * 100 / 600, self)
+        # self.bag = Bag(self.leaderboard.xmargin() / 3, self.leaderboard.ymargin() + 1, 2)
+        self.bottom_bar = BottomBar(0.5,
+                                    self.leaderboard.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
+                                    width_cells=(self.message_box.h_margin_cells - (1*TILE_ADJ_MULTIPLIER)),
+                                    height_cells=(Display.num_vert_cells() - self.leaderboard.ymargin()
+                                                  - (2*TILE_ADJ_MULTIPLIER)),
+                                    game=self)
 
-        # self.backgroundTiles = pygame.sprite.Group()
-        # self.helpbox = thorpy.Box(elements=[thorpy.Element("Hello")])
-        self.bottom_bar = BottomBar(0.5, self.bag.ymargin() + 1,
-                                    Display.num_horiz_cells() - 11,
-                                    Display.num_vert_cells() - self.bag.ymargin() - 1,
-                                    # self.chat.ymargin() - self.bag.ymargin() - 1,
-                                    self)
-
-        self.chat = Chat(self.message_box.h_margin_cells, self.bottom_bar.v_margin_cells,
-                         10, Display.num_vert_cells() - self.bottom_bar.v_margin_cells - 0.5,
+        self.chat = Chat(self.message_box.h_margin_cells,
+                         self.bottom_bar.v_margin_cells,
+                         h_percent(10 * TILE_ADJ_MULTIPLIER),
+                         Display.num_vert_cells() - self.bottom_bar.v_margin_cells
+                         - (1*TILE_ADJ_MULTIPLIER),
                          self)
 
         self.myrack = Inventory(self.bottom_bar.h_margin_cells + 5,
                                 self.bottom_bar.v_margin_cells + 1,
-                                self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 13, border_color=Colors.GRAY)
+                                self.bottom_bar.v_margin_cells - 6,
+                                2, 2 * TILE_ADJ_MULTIPLIER, 1, 13, border_color=Colors.GRAY)
 
         self.extrarack = Inventory(self.bottom_bar.h_margin_cells + 15,
-                                   self.bottom_bar.v_margin_cells + 5,
-                                   self.bottom_bar.v_margin_cells - 6, 2, 2.5, 1, 5, border_color=Colors.GRAY)
+                                   self.bottom_bar.v_margin_cells + (4 * TILE_ADJ_MULTIPLIER),
+                                   self.bottom_bar.v_margin_cells - (10 * TILE_ADJ_MULTIPLIER),
+                                   (2 * TILE_ADJ_MULTIPLIER), (2 * TILE_ADJ_MULTIPLIER),
+                                   1, 5, border_color=Colors.GRAY)
 
         self.top_bar.change_round(1)
         self.tileList = pygame.sprite.Group()
@@ -115,7 +146,7 @@ class GameUI:
         self.hb_thread.join()
 
     def draw(self):
-        self.surface.fill(BG_COLOR)
+        self.surface.fill(BG_COLOR.value)
         self.leaderboard.draw(self.surface)
         self.top_bar.draw(self.surface)
         # self.middle_bar.draw(self.win)
@@ -131,7 +162,7 @@ class GameUI:
         #         tile.size = tile.image.get_size()
         #         # print("not in box")
         # self.bag.draw(self.surface)
-        self.bag.drawMe()
+        # self.bag.drawMe()
         self.bottom_bar.draw(self.surface)
         self.chat.draw(self.surface)
 
@@ -523,13 +554,13 @@ class GameUI:
                     self.set_game(self.network.send(diceMessage))
                 except Exception as e:
                     log("dice roll notify failed", e)
+                self.refresh_inventory()
 
-            self.refresh_inventory()
             # %% end of server side DICE_ROLL handling
             return
 
         elif game_state == GameState.BUY:
-            if self.game_status.value < GameUIStatus.ENABLE_BUY.value:
+            if self.game_status.value <= GameUIStatus.ENABLE_BUY.value:
                 self.bottom_bar.enable_buy()
                 self.refresh_inventory()
                 self.game_status = GameUIStatus.BUY_ENABLED
@@ -562,7 +593,7 @@ class GameUI:
             return
 
         elif game_state == GameState.SELL:
-            if self.game_status.value < GameUIStatus.ENABLE_SELL.value:
+            if self.game_status.value <= GameUIStatus.ENABLE_SELL.value:
                 self.bottom_bar.enable_sell()
                 self.refresh_inventory(True)
                 self.game_status = GameUIStatus.SELL_ENABLED
