@@ -1,0 +1,18 @@
+# systemd unit file 
+  
+[Unit]
+Description=Buygame Service
+
+[Service]
+Type=simple
+User=buygame
+Group=buygame
+BASEBG_PATH=/usr/local/src/buygame
+WorkingDirectory=/usr/local/src/buygame
+ExecStart=/usr/local/src/buygame/venv/bin/python3 -m server.server
+# immediately log into systemd logs
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

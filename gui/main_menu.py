@@ -82,7 +82,8 @@ class MainMenu:
             try:
                 with open(CLIENT_DEFAULT_SETTINGS_FILE, 'r') as d_fp:
                     write_file(CLIENT_SETTINGS_FILE, lambda _f:
-                               yaml.safe_dump(yaml.safe_load(d_fp), _f))
+                               yaml.safe_dump(yaml.safe_load(d_fp), _f),
+                               overwrite=True)
             except FileNotFoundError as ffe:
                 log("INIT ERROR: ", ffe)
 
@@ -190,16 +191,16 @@ def main():
     for i in range(len(sys.argv)):
         if re.match("-ur|--user-reset", sys.argv[i].lower().strip()):
             _reset = True
-        if re.match("-rs|--restore", sys.argv[i].lower().strip()):
+        elif re.match("-rs|--restore", sys.argv[i].lower().strip()):
             _restore = True
-        if re.match("-u[\b]*|--user=", sys.argv[i].lower().strip()):
+        elif re.match("-u[\b]*|--user=", sys.argv[i].lower().strip()):
             if sys.argv[i].strip() == "-u":
                 i += 1 if i < len(sys.argv) - 1 else 0
                 user = sys.argv[i]
             else:
                 user = str(sys.argv[i]).split('=')[1]
 
-        if re.match("-s[\b]*|--server=", sys.argv[i].lower().strip()):
+        elif re.match("-s[\b]*|--server=", sys.argv[i].lower().strip()):
             if sys.argv[i].strip() == "-s":
                 i += 1 if i < len(sys.argv) - 1 else 0
                 server = sys.argv[i]

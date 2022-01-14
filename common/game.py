@@ -16,7 +16,7 @@ from threading import RLock
 
 from common.gameconstants import WILD_CARD, MAX_LETTERS_ON_HOLD
 from common.logger import log
-from common.utils import write_file
+from common.utils import write_file, calling_func_name
 
 nofw = 4
 # import player as pl
@@ -352,13 +352,10 @@ class GameTrackerEntry:
         return self._internal_dup_entry()
 
 
-def calling_func_name(level):
-    return inspect.getouterframes(inspect.currentframe())[level].function
-
-
 class Game:
-    def __init__(self, g_id, game_tiles, server_path: str):
+    def __init__(self, g_id, game_settings, game_tiles):
         self.game_id = g_id
+        self.game_settings = game_settings
         self._players: [Player] = []
         self.bag = Bag(game_tiles)
         self.turn = 0
@@ -366,7 +363,7 @@ class Game:
         self.message = ""
         self.begin_time = datetime.now().strftime("%m/%d %H.%M.%S")
         self.game_state = GameState.INIT
-        track_file = os.path.join(server_path, f"store/{g_id}.csv")
+        track_file = os.path.join(self.game_settings['store_path'], f"{os.getpid()}/{g_id}.csv")
         write_file(track_file, GameTrackerEntry.write_to_csv)
         self.game_mutex = RLock()
         self.game_tracker = open(track_file, 'w', True)

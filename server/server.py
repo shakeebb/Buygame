@@ -7,6 +7,7 @@ Created on Fri Mar 26 13:40:58 2021
 import datetime
 import pickle
 import random
+import signal
 import socket
 import os
 # import thread module
@@ -27,7 +28,8 @@ from common.gameconstants import *
 from common.logger import log
 from datetime import datetime
 
-from common.utils import serialize, deserialize, receive_message, ObjectType, write_file
+from common.utils import serialize, receive_message, ObjectType, write_file
+from server.server_utils import SignalHandler
 from server.socket import ClientSocket
 
 script_path = os.path.dirname(os.path.abspath(__file__))
@@ -42,6 +44,18 @@ class Server:
         # self.IP = "localhost"
         self.IP = "0.0.0.0"
         self.PORT = 1234
+        self.gameId = 0
+        self.socket_timeout = 0
+        write_file(SERVER_SETTINGS_FILE, lambda _f: yaml.safe_dump(SERVER_SETTINGS_TEMPLATE, _f))
+        with open(SERVER_SETTINGS_FILE) as fp:
+            self.server_settings = yaml.safe_load(fp)
+            self.server_defaults = self.server_settings['server_defaults']
+            self.game_settings = self.server_settings['game_settings']
+            self.IP = self.server_defaults['bind_ip']
+            self.PORT = int(self.server_defaults['bind_port'])
+            self.socket_timeout = int(self.server_defaults['socket_timeout'])
+            self.gameId = self.game_settings['last_gen_id']
+
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # SO_REUSEADDR  is being set to 1(true), if program is restarted TCP socket we created can be used again
         # without waiting for a for the socket to be fully closed.
@@ -50,7 +64,11 @@ class Server:
         # binding socket and listening for connections
         self.server_socket.bind((self.IP, self.PORT))
         self.server_socket.listen(4)
-        log("server started.....")
+        if self.socket_timeout > 0:
+            self.server_socket.settimeout(self.socket_timeout)
+        self.pid = os.getpid()
+        log(f"server started with pid={self.pid}")
+        self.is_server_active = True
         self.nofw = 4
         self.client_sockets_list: [ClientSocket] = []
         self.threads_list: [threading.Thread] = []
@@ -58,12 +76,23 @@ class Server:
         self.number_of_usr = 0
         self.waitingForGameToStart = True
         self.games: [Game] = []
-        self.gameId = 0
         self.number_of_usr = 0
         self.cleanup_interval = Event()
-        write_file(SERVER_SETTINGS_FILE, lambda _f:
-                   yaml.safe_dump(SERVER_SETTINGS_TEMPLATE, _f))
         self.handshake_lock = RLock()
+
+    def signal_handler(self, sig, frame):
+        if sig == signal.SIGINT or \
+                sig == signal.SIGTERM:
+            log(f"shutting down server pid={self.pid} with {sig}")
+            self.is_server_active = False
+            self.game_settings['last_gen_id'] = self.gameId
+            write_file(SERVER_SETTINGS_FILE,
+                       lambda fp: yaml.safe_dump(self.server_settings, fp),
+                       overwrite=True)
+            self.server_socket.close()  # will generate Bad file descriptor in socket.accept()
+        elif sig == signal.SIGKILL:
+            self.is_server_active = False
+            self.server_socket.close()
 
     def main(self):
         # Waiting for players to join lobby and to start game
@@ -75,7 +104,8 @@ class Server:
             ct.start()
             self.threads_list.append(ct)
 
-            while True:
+            while self.is_server_active:
+                log("listening on the server.....")
                 client_socket, client_address = self.server_socket.accept()
                 with self.handshake_lock:
                     client_socket.setblocking(True)
@@ -99,6 +129,13 @@ class Server:
                     ct.start()
                     self.threads_list.append(ct)
                     self.number_of_usr += 1
+        except OSError as ose:
+            if ose.errno != 9:  # 9 = Bad file descriptor (generated due to socket.close())
+                log("socket.error Terminating the server.", ose)
+                raise
+        except Exception as e:
+            log("Unexpected exception. Terminating the server.", e)
+            raise
         finally:
             self.cleanup_interval.set()
             for _cs in self.client_sockets_list:
@@ -127,7 +164,7 @@ class Server:
                     time.sleep(1)
                     continuous_retries -= 1
                     if continuous_retries <= 0:
-                        log(f"{MAX_RETRY} reached, {_cs} socket unreachable.")
+                        log(f"max_retry={MAX_RETRY} reached, closing unreachable socket {_cs}")
                         _cs.mark_inactive()
                     continue
                 if VERBOSE:
@@ -261,7 +298,7 @@ class Server:
                 word = data
                 _cs.player.sell(word, self.word_dict_csv)
                 if _cs.player.txn_status == Txn.SOLD_SELL_AGAIN:
-                        game.set_server_message(f"{ClientResp.Sold_Sell_Again.msg} word={word}")
+                    game.set_server_message(f"{ClientResp.Sold_Sell_Again.msg} word={word}")
                 elif _cs.player.txn_status == Txn.SOLD:
                     game.set_server_message(f"{ClientResp.Sold.msg} word={word}")
                 elif _cs.player.txn_status == Txn.SELL_FAILED:
@@ -368,7 +405,7 @@ class Server:
                     begin_time = typed_g.begin_time
                 else:
                     self.gameId = self.gameId + 1
-                    g = Game(self.gameId, self.GAMETILES, script_path)
+                    g = Game(self.gameId, self.game_settings, self.GAMETILES)
                     game_id = g.game_id
                     begin_time = g.begin_time
                     log(f"created a new game.... {g}")
@@ -398,4 +435,5 @@ class Server:
 
 if __name__ == '__main__':
     s = Server()
-    s.main()
+    with SignalHandler(s.signal_handler):
+        s.main()

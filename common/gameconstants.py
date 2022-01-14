@@ -1,3 +1,4 @@
+import os.path
 from enum import Enum, Flag, auto
 
 import pygame as pg
@@ -34,13 +35,15 @@ CLIENT_SETTINGS_TEMPLATE = {
 
 SERVER_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/server_settings.yaml')
 SERVER_SETTINGS_TEMPLATE = {
-    "server_settings": {
+    "server_defaults": {
         "bind_ip": "0.0.0.0",
-        "port": "36909"
+        "bind_port": "36909",
+        "socket_timeout": "0"
     }
     ,
     "game_settings": {
-        "last_id": "",
+        "last_gen_id": "",
+        "store_path": Path(os.path.dirname(SERVER_SETTINGS_FILE)).joinpath('storage').name
     }
 }
 
