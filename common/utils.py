@@ -1,3 +1,4 @@
+import inspect
 import os
 import pickle
 import socket
@@ -21,6 +22,10 @@ class ObjectType(Enum):
     @classmethod
     def parse_msg_string(cls, msg_str):
         return cls(msg_str)
+
+
+def calling_func_name(level):
+    return inspect.getouterframes(inspect.currentframe())[level].function
 
 
 def get_std_hdr(o, m):
@@ -63,8 +68,12 @@ def receive_pickle(client_socket):
         message_length = 0
         msg_type: ObjectType = ObjectType.NONE
         while message_length == 0:
-            msg_type, message_length = parse_std_hdr(recvall(client_socket, STD_HEADER_LENGTH))
-            if msg_type is None:
+            try:
+                msg_type, message_length = parse_std_hdr(recvall(client_socket, STD_HEADER_LENGTH))
+                if msg_type is None:
+                    return False
+            except BrokenPipeError as bpe:
+                log(f"Unable to read std header in {calling_func_name(1)}:- {bpe.__str__()}")
                 return False
         assert msg_type == ObjectType.OBJECT
 
@@ -83,11 +92,13 @@ def receive_message(client_socket, block: bool = False):
         message_length = 0
         msg_type: ObjectType = ObjectType.NONE
         while message_length == 0:
-            msg_type, message_length = parse_std_hdr(recvall(client_socket, STD_HEADER_LENGTH))
-            if not block and msg_type is None:
+            try:
+                msg_type, message_length = parse_std_hdr(recvall(client_socket, STD_HEADER_LENGTH))
+                if not block and msg_type is None:
+                    return False
+            except BrokenPipeError as bpe:
+                log(f"Unable to read std header in {calling_func_name(1)}:- {bpe.__str__()}")
                 return False
-            # time.sleep(0.001)
-
         assert msg_type == ObjectType.MESSAGE
         return deserialize(msg_type, recvall(client_socket, message_length))
     except Exception as e:
@@ -103,18 +114,19 @@ def recvall(sock, size):
         received = sock.recv(min(remaining, buf_size), socket.MSG_WAITALL)
         # print(f"len(received) {len(received)} remaining {remaining}")
         if not received:
-            raise Exception('unexpected EOF. Possibly client connection is closed ?')
+            raise BrokenPipeError('unexpected EOF. connection is closed ?')
         received_chunks.append(received)
         remaining -= len(received)
     return b''.join(received_chunks)
 
 
-def write_file(file: str, writer=None):
+def write_file(file: str, writer=None, overwrite=False):
     try:
-        if not os.path.exists(file):
+        if not os.path.exists(file) or overwrite:
             Path(os.path.dirname(file)).mkdir(mode=0o755, parents=True, exist_ok=True)
             with open(file, 'w') as fp:
                 writer(fp)
     except FileNotFoundError as ffe:
         log("GAME INIT ERROR: ", ffe)
         raise
+
