@@ -1,0 +1,62 @@
+cleanup () 
+{ 
+    cd /usr/local/src/buygame
+    [[ -f /home/soubhik/p.diff ]] && mv /home/soubhik/p.diff .;
+    git reset --hard;
+    patch -p1 < p.diff;
+    cp buygame.service /etc/systemd/system/
+    cp buygame.logrotate /etc/logrotate.d/buygame
+    systemctl daemon-reload;
+    systemctl stop buygame.service;
+    systemctl restart buygame.service
+}
+
+# ssh soubhik@23.239.14.203 -p 33
+# scp -P 33 p.diff soubhik@23.239.14.203:~
+# logrotate /etc/logrotate.d/buygame --state ./tmp-st --verbose --force
+
+configure_buygame()
+{
+  groupadd buygame
+  mkdir -p /home/buygame/file_storage
+  useradd buygame -g buygame -d /home/buygame -s /usr/sbin/nologin
+  chown -R buygame:buygame /home/buygame
+  cp buygame.service /etc/systemd/system/
+  cp buygame.logrotate /etc/logrotate.d/buygame
+  chown -R buygame:buygame /usr/local/src/buygame
+}
+
+configure_server()
+{
+  cat >/etc/ssh/sshd_config <-EOF
+	Port 33
+	PermitRootLogin without-password
+	ChallengeResponseAuthentication no
+	PasswordAuthentication no
+	AllowUsers root soubhik shakeeb
+	PubkeyAuthentication yes
+EOF
+   mkdir -p /home/soubhik/.ssh
+   useradd soubhik -g root -G sudo -d /home/soubhik -s /bin/bash
+   chown -R soubhik:root /home/soubhik/
+   chmod -R 700 /home/soubhik/.ssh
+   passwd soubhik
+   su - soubhik
+
+   cat >/home/soubhik/.ssh/authorized_keys <-EOF
+	<REPLACE-WITH-MY-ID-RSA-PUB-KEY>	
+EOF
+
+   [[ ! -f ~/.ssh ]] && mkdir ~/.ssh
+   [[ ! -f ~/.ssh/authorized_keys ]] && cp /home/soubhik/.ssh/authorized_keys ~/.ssh || \
+	cat /home/soubhik/.ssh/authorized_keys >> ~/.ssh/authorized_keys
+
+   service ssh reload
+
+   apt install ufw -y
+   ufw default deny incoming
+   ufw default allow outgoing
+   ufw allow 33/tcp
+   ufw allow proto tcp from any to any port 36909
+   ufw enable 
+}

@@ -102,7 +102,7 @@ class Network:
     def connect(self) -> Game:
         with self.con_mutex:
             try:
-                log("time to connect")
+                log(f"time to connect {self.addr}")
                 return self.__connect(False)
             except Exception as e:
                 log("failed to connect", e)

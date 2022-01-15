@@ -1,4 +1,4 @@
-from common.game import Game, Player, Tile
+from common.game import Game, Player, Tile, Txn
 import time
 from common.gameconstants import ClientMsgReq, GameUIStatus, Colors, ClientResp
 from common.logger import log
@@ -133,17 +133,18 @@ class ClientUtils:
         ret_game = network.send(try_selling)
         assert ret_game is not None
         game = ret_game
+        notify_srv_msg(f"{game.get_server_message()} ")
         # time.sleep(1)
         player: Player = game.players()[number]
-        serverMessage = game.get_server_message()
-        if player.txn_status:
-            notify_srv_msg(f"{serverMessage} ")
-            if ClientResp.Sold.msg in serverMessage:
-                ret_status = GameUIStatus.SOLD
-            elif ClientResp.Sold_Sell_Again.msg in serverMessage:
-                ret_status = GameUIStatus.SELL_AGAIN
-            messagebox_notify(f"Sold for {player.wordvalue}. You have ${player.money}", Colors.GREEN)
+        # serverMessage = game.get_server_message()
+        if player.txn_status == Txn.SOLD:
+            ret_status = GameUIStatus.SOLD
+        elif player.txn_status == Txn.SOLD_SELL_AGAIN:
+            ret_status = GameUIStatus.SELL_AGAIN
+        # messagebox_notify(f"Sold for {player.wordvalue}. You have ${player.money}", Colors.GREEN)
             # break
+        elif player.txn_status == Txn.SELL_CANCELLED_SELL_AGAIN:
+            ret_status = GameUIStatus.SELL_AGAIN
         else:
             # attempt -= 1
             notify_cln_msg(

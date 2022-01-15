@@ -1,0 +1,15 @@
+/var/log/buygame.log
+{
+        su root root
+        rotate 4
+        daily
+        missingok
+        notifempty
+        compress
+        delaycompress
+        sharedscripts
+        create 644 buygame buygame
+        postrotate
+                invoke-rc.d rsyslog rotate >/dev/null 2>&1 || true
+        endscript
+}

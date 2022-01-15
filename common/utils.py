@@ -122,9 +122,14 @@ def recvall(sock, size):
 
 def write_file(file: str, writer=None, overwrite=False):
     try:
-        if not os.path.exists(file) or overwrite:
+        if not os.path.exists(file):
             Path(os.path.dirname(file)).mkdir(mode=0o755, parents=True, exist_ok=True)
             with open(file, 'w') as fp:
+                log(f"writing new server settings file {file}")
+                writer(fp)
+        elif overwrite:
+            with open(file, 'w') as fp:
+                log(f"Overwriting server settings file {file} ")
                 writer(fp)
     except FileNotFoundError as ffe:
         log("GAME INIT ERROR: ", ffe)

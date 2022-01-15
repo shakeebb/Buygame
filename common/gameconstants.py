@@ -25,7 +25,7 @@ CLIENT_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/settings.yaml')
 CLIENT_SETTINGS_TEMPLATE = {
     "server_defaults": {
         "ip": "23.239.14.203",
-        "port": "1234"
+        "port": "36909"
     }
     ,
     "user_defaults": {
@@ -34,6 +34,10 @@ CLIENT_SETTINGS_TEMPLATE = {
 }
 
 SERVER_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/server_settings.yaml')
+STORE_PATH = os.environ.get('STORAGE_PATH')
+if STORE_PATH is None:
+    STORE_PATH = os.path.dirname(SERVER_SETTINGS_FILE)
+STORE_PATH = Path(str(STORE_PATH)).joinpath('data')
 SERVER_SETTINGS_TEMPLATE = {
     "server_defaults": {
         "bind_ip": "0.0.0.0",
@@ -42,8 +46,8 @@ SERVER_SETTINGS_TEMPLATE = {
     }
     ,
     "game_settings": {
-        "last_gen_id": "",
-        "store_path": Path(os.path.dirname(SERVER_SETTINGS_FILE)).joinpath('storage').name
+        "last_gen_id": "0",
+        "store_path": f"{STORE_PATH}"
     }
 }
 
@@ -142,31 +146,35 @@ class ClientResp(Enum):
 
 class GameUIStatus(Enum):
     INITIAL_STATE = auto()
-    ERROR = auto()
-    WAIT_START = auto()
     PLAY = auto()
     ROLL_DICE = auto()
     PROMPT_DICE_INPUT = auto()
     DICE_ROLL_COMPLETE = auto()
-    WAIT_TURN = auto()
-    RECEIVE_RACKS = auto()
-    ENABLE_BUY = auto()
     BUY_ENABLED = auto()
     BUY = auto()
-    BOUGHT = auto()
-    BUY_FAILED = auto()
     CANCEL_BUY = auto()
-    BUY_CANCELLED = auto()
-    BUY_CANCEL_FAILED = auto()
     ENABLE_SELL = auto()
     SELL_ENABLED = auto()
+
     SELL = auto()
     CANCEL_SELL = auto()
-    SOLD = auto()
-    SELL_AGAIN = auto()
-    SELL_FAILED = auto()
     I_PLAYED = auto()
+
+    ERROR = auto()
+
     END_TURN = auto()
     TURN_COMPLETE = auto()
     WAIT_ALL_PLAYED = auto()
     ROUND_COMPLETE = auto()
+
+    WAIT_START = auto()
+    WAIT_TURN = auto()
+    RECEIVE_RACKS = auto()
+    ENABLE_BUY = auto()
+    BOUGHT = auto()
+    BUY_FAILED = auto()
+    BUY_CANCELLED = auto()
+    BUY_CANCEL_FAILED = auto()
+    SOLD = auto()
+    SELL_AGAIN = auto()
+    SELL_FAILED = auto()

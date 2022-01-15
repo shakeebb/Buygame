@@ -26,6 +26,9 @@ class InputText:
         self.x = x
         self.y = y
 
+    def __repr__(self):
+        return self.text
+
     def set_text(self, txt):
         if txt is None:
             return
@@ -104,13 +107,17 @@ class MainMenu:
         if num_usrs.__len__() == 1:
             def_usr = num_usrs.__iter__().__next__()
 
-        self.controls.append(InputText(200, 400,
+        self.controls.append(InputText(200, 300,
                                        "Type a Name: ",
                                        def_usr,
                                        in_focus=True))
-        self.controls.append(InputText(200, 600,
+        self.controls.append(InputText(200, 400,
                                        "Connect to Server: ",
                                        self.game_settings['server_defaults']['ip']))
+
+        self.controls.append(InputText(200, 500,
+                                       "Connect to Server Port: ",
+                                       self.game_settings['server_defaults']['port']))
 
     def draw(self):
         self.surface.fill(self.BG)
@@ -165,7 +172,7 @@ class MainMenu:
                         self.cur_input_field += 1
                         if self.cur_input_field >= len(self.controls):
                             self.waiting = True
-                            log(f"marking end of field entry(s) {self.controls[0].text} {self.controls[1].text}")
+                            log(f"marking end of field entry(ies) {self.controls}")
                             continue
                         self.controls[self.cur_input_field].begin_input()
                         # self.n = Network(self.name)
@@ -187,6 +194,7 @@ def main():
     _reset: bool = False
     _restore: bool = False
     user = server = ""
+    port = 0
     import re
     for i in range(len(sys.argv)):
         if re.match("-ur|--user-reset", sys.argv[i].lower().strip()):
@@ -206,10 +214,17 @@ def main():
                 server = sys.argv[i]
             else:
                 server = str(sys.argv[i]).split('=')[1]
+        elif re.match("-p[\b]*|--port=", sys.argv[i].lower().strip()):
+            if sys.argv[i].strip() == "-p":
+                i += 1 if i < len(sys.argv) - 1 else 0
+                port = int(sys.argv[i])
+            else:
+                port = int(sys.argv[i]).split('=')[1]
 
     _main = MainMenu(_reset, _restore)
     _main.controls[0].set_text(user if len(user) > 0 else None)
     _main.controls[1].set_text(server if len(server) > 0 else None)
+    _main.controls[2].set_text(port if port > 0 else None)
     _main.run()
 
 
