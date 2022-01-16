@@ -11,6 +11,7 @@ from pygame.surface import Surface
 import common
 from common.client_utils import ClientUtils
 from gui.bottom_bar import BottomBar
+from gui.button import MessageBox
 from gui.chat import Chat
 from common import network
 from common.game import *
@@ -50,11 +51,11 @@ class GameUI:
         self.surface = Display.surface()
 
         self.top_bar = TopBar(0.5, 0.5,
-                              width_cells=Display.num_horiz_cells() - (1*TILE_ADJ_MULTIPLIER),
+                              width_cells=Display.num_horiz_cells() - (1 * TILE_ADJ_MULTIPLIER),
                               height_cells=4 * TILE_ADJ_MULTIPLIER)
 
         def h_percent(p: int):
-            return Display.num_horiz_cells() * (p*.01)
+            return Display.num_horiz_cells() * (p * .01)
 
         self.leaderboard = Leaderboard(0.5,
                                        self.top_bar.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
@@ -97,16 +98,16 @@ class GameUI:
         # self.bag = Bag(self.leaderboard.xmargin() / 3, self.leaderboard.ymargin() + 1, 2)
         self.bottom_bar = BottomBar(0.5,
                                     self.leaderboard.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
-                                    width_cells=(self.message_box.h_margin_cells - (1*TILE_ADJ_MULTIPLIER)),
+                                    width_cells=(self.message_box.h_margin_cells - (1 * TILE_ADJ_MULTIPLIER)),
                                     height_cells=(Display.num_vert_cells() - self.leaderboard.ymargin()
-                                                  - (2*TILE_ADJ_MULTIPLIER)),
+                                                  - (2 * TILE_ADJ_MULTIPLIER)),
                                     game=self)
 
         self.chat = Chat(self.message_box.h_margin_cells,
                          self.bottom_bar.v_margin_cells,
                          h_percent(10 * TILE_ADJ_MULTIPLIER),
                          Display.num_vert_cells() - self.bottom_bar.v_margin_cells
-                         - (1*TILE_ADJ_MULTIPLIER),
+                         - (1 * TILE_ADJ_MULTIPLIER),
                          self)
 
         self.myrack = Inventory(self.bottom_bar.h_margin_cells + 5,
@@ -132,6 +133,7 @@ class GameUI:
         self.hb_event = Event()
         self.last_notification_received = 0
         self.current_round = -1
+        self.alert_boxes = []
 
     def quit(self):
         self.main_menu.save_gamesettings()
@@ -170,6 +172,8 @@ class GameUI:
         for __i in [self.inventory, self.myrack, self.extrarack, self.temp_rack]:
             tile_grp(__i)
         # self.tileList.draw(self.surface)
+        if len(self.alert_boxes) > 0:
+            self.alert_boxes[0].draw(self.surface)
 
         Display.display_grid()
         Display.show()
@@ -278,9 +282,15 @@ class GameUI:
         self.hb_thread.start()
 
         while True:  # main game loop
-            letter = chr(random.randint(65, 90))
-            mouseClicked = False
             for event in pygame.event.get():  # event handling loop
+                # check alert boxes at first. modal windows
+                if len(self.alert_boxes) > 0:
+                    if event.type == KEYUP and event.key == K_ESCAPE:
+                        self.alert_boxes[0].destroy()
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        self.alert_boxes[0].button_events(*pygame.mouse.get_pos())
+                    continue
+
                 if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
                     self.quit()
                     pygame.quit()
@@ -294,11 +304,10 @@ class GameUI:
                     self.bottom_bar.roll_dice()
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pos = pygame.mouse.get_pos()
-                    x, y = pos
                     selected = self.check_clicks()
-                    self.top_bar.button_events()
-                    self.bottom_bar.button_events()
+                    if selected is None:
+                        self.top_bar.button_events()
+                        self.bottom_bar.button_events()
                     # if event.button == 1:
                     #     boxpos = self.inventory.Get_pos()
                     #     if self.inventory.In_grid(boxpos[0], boxpos[1]):
@@ -424,11 +433,14 @@ class GameUI:
         for n in self.me().notify_msg:
             if n.n_id <= self.last_notification_received:
                 continue
+            alert_box = False
             color = Colors.BLACK
             if n.n_type == NotificationType.ERR:
                 color = Colors.RED
+                alert_box = True
             elif n.n_type == NotificationType.WARN:
                 color = Colors.ORANGE
+                alert_box = True
             elif n.n_type == NotificationType.INFO:
                 color = Colors.NAVY_BLUE
             elif n.n_type == NotificationType.ACT_1:
@@ -436,18 +448,27 @@ class GameUI:
             elif n.n_type == NotificationType.ACT_2:
                 color = Colors.DIRTY_YELLOW
             # log(f"SB: adding notify {n.get_msg()}")
-            self.messagebox_notify(n.get_msg(), color)
+            self.messagebox_notify(n.get_msg(), color, is_an_alert=alert_box)
             last_notification = n
 
         if last_notification is not None:
             self.last_notification_received = last_notification.n_id
 
-    def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK):
+    def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK, is_an_alert=False):
         for m in msg.split(NL_DELIM):
             if m[0] == '-':
                 self.message_box.add_msg(m, color)
             else:
                 self.message_box.add_msg('  ' + m, color)
+
+        if color == Colors.RED or is_an_alert:
+            self.alert_boxes.append(MessageBox(self.surface.get_width(),
+                                               self.surface.get_height(),
+                                               20, 5,
+                                               msg,
+                                               "ok",
+                                               in_display=True,
+                                               on_ok=lambda: self.alert_boxes.pop(0)))
 
     def check_round_complete(self):
         (self.ui_game_status, r, _g_obj) = ClientUtils.round_done(self.top_bar.round, self.network,
@@ -482,7 +503,9 @@ class GameUI:
         return self.__game
 
     def set_iplayed(self, txn_state: Txn):
-        if txn_state == Txn.SOLD_SELL_AGAIN or txn_state == Txn.SELL_CANCELLED_SELL_AGAIN:
+        if txn_state == Txn.SOLD_SELL_AGAIN \
+                or txn_state == Txn.SELL_CANCELLED_SELL_AGAIN\
+                or txn_state == Txn.NO_SELL:
             self.bottom_bar.enable_sell()
             remaining = self.me().get_remaining_letters()
             self.messagebox_notify(f"Sell atleast {remaining} letter(s).", Colors.RED)
@@ -613,13 +636,13 @@ class GameUI:
 
             if self.ui_game_status == GameUIStatus.SELL:
                 if len(self.top_bar.word) == 0:
-                    self.messagebox_notify("Cannot sell a blank word", Colors.RED)
+                    self.messagebox_notify("- Cannot sell a blank word", Colors.RED)
                     self.ui_game_status = GameUIStatus.ENABLE_SELL
                     return
 
                 num_wild_cards = len(self.top_bar.word.split(WILD_CARD))
-                if num_wild_cards > 1:
-                    msg = f"You cannot have {num_wild_cards} wild cards" \
+                if num_wild_cards > 2:
+                    msg = f"- You cannot have {num_wild_cards} wild cards" \
                           f"{NL_DELIM}in a word, only 1 allowed."
                     self.messagebox_notify(msg, Colors.RED)
                     self.ui_game_status = GameUIStatus.ENABLE_SELL

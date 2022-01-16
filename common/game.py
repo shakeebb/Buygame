@@ -14,7 +14,8 @@ from enum import Enum, auto
 from random import shuffle
 from threading import RLock
 
-from common.gameconstants import WILD_CARD, MAX_LETTERS_ON_HOLD, NL_DELIM
+from common.gameconstants import WILD_CARD, MAX_LETTERS_ON_HOLD, NL_DELIM, NotificationType, ConnectionStatus, Txn, \
+    PlayerState
 from common.logger import log
 from common.utils import write_file, calling_func_name
 
@@ -24,32 +25,6 @@ nofw = 4
 dice = ['2', '3', '4', '5', 'Your Choice', 'Your Choice']
 # will store values of user
 myTiles = []
-
-
-class PlayerState(Enum):
-    INIT = auto()
-    PLAY = auto()
-    WAIT = auto()
-
-    def __repr__(self):
-        return self.name
-
-    def __str__(self):
-        return f"p={self.__repr__()}"
-
-
-class NotificationType(Enum):
-    INFO = auto()
-    WARN = auto()
-    ERR = auto()
-    ACT_1 = auto()
-    ACT_2 = auto()
-
-    def __repr__(self):
-        return self.name
-
-    def __str__(self):
-        return f"nt={self.__repr__()}"
 
 
 class Notification:
@@ -76,42 +51,6 @@ def word_value(sold_word):
     return score ** 2
 
 
-class Txn(Enum):
-    INIT = auto()
-    ROLLED = auto()
-    NO_BUY = auto()
-    BOUGHT = auto()
-    BUY_CANCELLED = auto()
-    SOLD = auto()
-    SOLD_SELL_AGAIN = auto()
-    SELL_CANCELLED = auto()
-    SELL_CANCELLED_SELL_AGAIN = auto()
-    NO_SELL = auto()
-    BUY_FAILED = auto()
-    BUY_CANCEL_FAILED = auto()
-    SELL_FAILED = auto()
-    SELL_CANCEL_FAILED = auto()
-
-    def __repr__(self):
-        return self.name
-
-    def __str__(self):
-        return f"tx={self.__repr__()}"
-
-
-class ConnectionStatus(Enum):
-    INIT = auto()
-    CONNECTED = auto()
-    LEFT = auto()
-
-    def __repr__(self):
-        return self.name
-
-    def __str__(self):
-        return f"cs={self.__repr__()}"
-
-
-
 class Player:
     """
 
@@ -127,7 +66,7 @@ class Player:
         self.name = name
         self.p_conn_status = ConnectionStatus.INIT
         self.rack = Rack(nofw, bag)
-        self.money = 200
+        self.money = self.game.game_settings['player_start_money']
         self.team = team
         self.txn_status = Txn.INIT
         self.wordvalue = 0
@@ -140,7 +79,7 @@ class Player:
         self.session_id = ""
 
     def __repr__(self):
-        return f"{self.game.game_state} {self.name} {self.player_state} " \
+        return f"gid={self.game.game_id} {self.game.game_state} p={self.number} {self.player_state} " \
                f"{self.txn_status} {self.p_conn_status}"
 
     def set_name(self, name):
@@ -171,12 +110,12 @@ class Player:
     def insufficient_balance(self):
         msg = f"${self.money} not enough to buy" \
               f"{NL_DELIM}{self.rack.get_temp_str()} for ${self.rack.get_temp_value()}"
-        self.set_notify(NotificationType.WARN,
+        self.set_notify(NotificationType.ERR,
                         msg)
         cleared_rack = self.rack.clear_temp_rack()
         self.player_state = PlayerState.WAIT
         self.txn_status = Txn.NO_BUY
-        self.game.track(self, lambda gte: gte.update_msg(msg, NotificationType.WARN,
+        self.game.track(self, lambda gte: gte.update_msg(msg, NotificationType.ERR,
                                                          buy_rack=cleared_rack))
 
     # def setPlayerMessage(self, message):
@@ -282,10 +221,12 @@ class Player:
                     self.txn_status = Txn.SOLD_SELL_AGAIN
                 else:
                     self.txn_status = Txn.SOLD
-                ret_val = self.game.player_selling(self, ''.join(map(lambda t: t.letter, sold_word)), value)
+                ret_val = self.game.player_selling(self, ''.join(map(lambda t: t.letter, sold_word)),
+                                                   word_regex=search_wrd,
+                                                   value=value)
         else:
             num_wild_cards = len(word.split(WILD_CARD))
-            if num_wild_cards > 1:
+            if num_wild_cards > 2:
                 msg = f"Have {num_wild_cards} wild cards " \
                       f"in a word, only 1 allowed."
             else:
@@ -389,13 +330,13 @@ class GameTrackerEntry:
     @classmethod
     def write_to_csv(cls, fp):
         csv.writer(fp, quoting=csv.QUOTE_NONNUMERIC).writerow(
-                GameTrackerEntry().get_column_names()
-            )
+            GameTrackerEntry().get_column_names()
+        )
 
     def commit(self, file):
         csv.writer(file, quoting=csv.QUOTE_NONNUMERIC).writerow(
-                self.__dict__.values()
-            )
+            self.__dict__.values()
+        )
         return self._internal_dup_entry()
 
 
@@ -450,10 +391,12 @@ class Game:
         self.foreach_player(lambda _p: _p.set_notify(NotificationType.ACT_1, msg),
                             lambda _p: _p.player_state == PlayerState.WAIT)
 
-    def notify_all_players(self, p_number, self_msg, other_msg):
-        self.foreach_player(lambda _p: _p.set_notify(NotificationType.ACT_1, other_msg),
+    def notify_all_players(self, p_number, self_msg, other_msg,
+                           self_notify_type=NotificationType.ACT_1,
+                           others_notify_type=NotificationType.ACT_2):
+        self.foreach_player(lambda _p: _p.set_notify(others_notify_type, other_msg),
                             lambda _p: _p.number != p_number,
-                            lambda _p: _p.set_notify(NotificationType.ACT_2, self_msg))
+                            lambda _p: _p.set_notify(self_notify_type, self_msg))
 
     def set_roll(self):
         if self.round > 15:
@@ -557,6 +500,7 @@ class Game:
         # self.track(p, lambda gte: gte.update_msg("Buy complete.", NotificationType.ACT_2))
 
     def player_selling(self, p: Player, word_str="", word_regex="", value=0):
+        s_notify_t = NotificationType.ACT_1
         if p.txn_status == Txn.SOLD:
             s_m = f"you sold {word_str} for ${value}"
             o_m = f"{p.name} sold {word_str} for ${value}"
@@ -567,15 +511,14 @@ class Game:
             o_m = f"{p.name} sold {word_str} for ${value}." \
                   f"{NL_DELIM}must sell {p.get_remaining_letters()} more letters"
             p.set_state(PlayerState.PLAY)
+            s_notify_t = NotificationType.ERR
         elif p.txn_status == Txn.SELL_CANCELLED_SELL_AGAIN:
             s_m = f"you did not sell any letters" \
                   f"{NL_DELIM}but must sell {p.get_remaining_letters()} more letters"
             o_m = f"{p.name} did not sell any letters" \
                   f"{NL_DELIM}but must sell {p.get_remaining_letters()} more letters."
-            self.notify_all_players(p.number, s_m, o_m)
-            self.track(p, lambda gte: gte.update_msg(s_m, value=value))
+            s_notify_t = NotificationType.ERR
             p.set_state(PlayerState.PLAY)
-            return GameState.SELL
         elif p.txn_status == Txn.SELL_CANCELLED:
             s_m = f"you did not sell letters."
             o_m = f"{p.name} did not sell letters."
@@ -590,12 +533,15 @@ class Game:
             else:
                 s_m = f"your word {word_str} doesn't exists"
                 o_m = f"{p.name}'s word {word_str} doesn't exists"
-            p.set_state(PlayerState.WAIT)
+            s_notify_t = NotificationType.ERR
+            # p.set_state(PlayerState.WAIT)
+            p.set_state(PlayerState.PLAY)
         else:
             s_m = f"you unexpected status {p.txn_status}"
             o_m = f"{p.name} unexpected status {p.txn_status}"
+            s_notify_t = NotificationType.ERR
 
-        self.notify_all_players(p.number, s_m, o_m)
+        self.notify_all_players(p.number, s_m, o_m, self_notify_type=s_notify_t)
         self.track(p, lambda gte: gte.update_msg(o_m, sold_word=word_str, value=value))
 
         in_play = self.players_in_state(PlayerState.PLAY)
@@ -603,6 +549,11 @@ class Game:
             w_msg = 'Waiting for ' + ','.join(map(lambda tp: tp.name, in_play)) + ' to SELL'
             self.notify_waiting_players(w_msg)
             return None
+
+        if p.txn_status == Txn.SOLD_SELL_AGAIN \
+                or p.txn_status == Txn.SELL_CANCELLED_SELL_AGAIN \
+                or p.txn_status == Txn.NO_SELL:
+            return
 
         m = f"Round {self.round} complete."
         self.foreach_player(lambda _p: _p.set_notify(NotificationType.ACT_2, m))
@@ -613,7 +564,7 @@ class Game:
         n_msg = f"{p.name} left"
         self.foreach_player(lambda _p: _p.set_inactive(),
                             lambda _p: _p.number == p.number,
-                            lambda _p: _p.set_notify(NotificationType.WARN, n_msg))
+                            lambda _p: _p.set_notify(NotificationType.ACT_2, n_msg))
         self.track(p, lambda gte: gte.update_msg(n_msg, NotificationType.ACT_2))
 
     def player_joined(self, p_num: int, team_id: int):

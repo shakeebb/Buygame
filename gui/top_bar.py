@@ -31,15 +31,19 @@ class TopBar(Display):
                                             Colors.YELLOW, "Init",
                                             Colors.YELLOW)
         self.connection_button.change_font_size(15)
-        self.server_msg = Label(self.xmargin() - 20,
-                                self.v_margin_cells + int(self.height_cells / 2),
-                                20, 2,
-                                Align.RIGHT, 15)
-        self.client_msgs = MessageList(self.h_margin_cells + self.width_cells - 19.5,
+        self.client_msgs = MessageList(self.h_margin_cells + (width_cells - 19*TILE_ADJ_MULTIPLIER),
                                        self.v_margin_cells + 0.5,
-                                       12*TILE_ADJ_MULTIPLIER,
+                                       12 * TILE_ADJ_MULTIPLIER,
                                        3 * TILE_ADJ_MULTIPLIER,
                                        5, 15)
+        adj = pygame.font.SysFont("timesnewroman", 14, italic=True).\
+            render("ABCDEFZ", True, (0, 0, 0)).get_height()
+
+        # eq = (((self.ymargin() * INIT_TILE_SIZE) - adj * TILE_ADJ_MULTIPLIER)//INIT_TILE_SIZE)
+        self.server_msg = Label(self.xmargin() - (20 * TILE_ADJ_MULTIPLIER),
+                                self.ymargin() - (1.5 * TILE_ADJ_MULTIPLIER),
+                                20 * TILE_ADJ_MULTIPLIER, 1.5 * TILE_ADJ_MULTIPLIER,
+                                Align.RIGHT, 14)
 
     def draw(self, win):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
@@ -66,11 +70,11 @@ class TopBar(Display):
                 self.__set_connection_status(Colors.RED)
                 # self.button = pygame.draw.rect(win, self.color, self.start_button_pos, 0)
         self.connection_button.draw(win)
-        pygame.draw.circle(win, (0, 0, 0), (self.x + self.width - 50, self.y + round(self.height / 2)), 30,
-                           self.BORDER_THICKNESS)
-        timer = self.round_font.render(str(self.time), 1, (0, 0, 0))
-        win.blit(timer,
-                 (self.x + self.width - 50 - timer.get_width() / 2, self.y + self.height / 2 - timer.get_height() / 2))
+        # pygame.draw.circle(win, (0, 0, 0), (self.x + self.width - 50, self.y + round(self.height / 2)), 30,
+        #                    self.BORDER_THICKNESS)
+        # timer = self.round_font.render(str(self.time), 1, (0, 0, 0))
+        # win.blit(timer,
+        #          (self.x + self.width - 50 - timer.get_width() / 2, self.y + self.height / 2 - timer.get_height() / 2))
 
     @staticmethod
     def underscore_text(text):

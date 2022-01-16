@@ -286,7 +286,7 @@ class Server:
                         log(f"discarding notify msg {_popped_m}")
                 else:
                     break
-            game.set_server_message(f"{ClientResp.GET_RET.msg} {_cs.player}")
+            game.set_server_message(f"{_cs.player}")
             # if VERBOSE:
             #     game.set_server_message(f"{ClientResp.GET_RET.msg} {_cs.player}")
             # else:

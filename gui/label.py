@@ -17,13 +17,14 @@ class Label(Display):
                  align: Align = Align.CENTER,
                  font_sz: int = 12, color: Colors = Colors.BLACK, border_color: Colors = None):
         super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
-        self.__text = "initial text"
+        self.__text = "INITIAL TEXT"
         self.align: Align = align
         self.font_sz = font_sz
         self.color: Colors = color
         self.border_color = border_color
         self.font = pygame.font.SysFont("timesnewroman", self.font_sz, italic=True)
-        self.__label_txt = self.font.render(self.__text, 1, (0, 0, 0))
+        self.__label_txt = self.font.render(self.__text, True, (0, 0, 0))
+        self.v_margin_cells += (self.__label_txt.get_height() * TILE_ADJ_MULTIPLIER)
         self.__label_x = 0
         self.__label_y = 0
         self.refresh_dims()

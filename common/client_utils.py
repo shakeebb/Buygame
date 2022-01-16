@@ -93,8 +93,8 @@ class ClientUtils:
         serverMessage = game.get_server_message()
         notify_srv_msg(f"{serverMessage} ")
         if ClientResp.Bought.msg in serverMessage:
-            notify_cln_msg("you now have $%s" % player.money)
-            messagebox_notify(f"Bought. You have ${player.money} ", Colors.GREEN)
+            notify_cln_msg("bought. you now have $%s" % player.money)
+            # messagebox_notify(f"Bought. You have ${player.money} ", Colors.GREEN)
             return GameUIStatus.BOUGHT, game
         else:
             messagebox_notify(f"Buy failed. You have ${player.money} ", Colors.RED)
@@ -151,7 +151,7 @@ class ClientUtils:
                 f"You failed to sell the word",
                 Colors.RED
             )
-            messagebox_notify(f"Sell failed. You have ${player.money}", Colors.RED)
+            # messagebox_notify(f"Sell failed. You have ${player.money}", Colors.RED)
             ret_status = GameUIStatus.SELL_FAILED
 
         notify_cln_msg("You now have: $%s" % player.money)
