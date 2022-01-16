@@ -47,6 +47,7 @@ class Server:
         self.gameId = 0
         self.socket_timeout = 0
         write_file(SERVER_SETTINGS_FILE, lambda _f: yaml.safe_dump(SERVER_SETTINGS_TEMPLATE, _f))
+        log(f"about to read {SERVER_SETTINGS_FILE}")
         with open(SERVER_SETTINGS_FILE) as fp:
             self.server_settings = yaml.safe_load(fp)
             self.server_defaults = self.server_settings['server_defaults']
@@ -54,7 +55,8 @@ class Server:
             self.IP = self.server_defaults['bind_ip']
             self.PORT = int(self.server_defaults['bind_port'])
             self.socket_timeout = int(self.server_defaults['socket_timeout'])
-            self.gameId = self.game_settings['last_gen_id']
+            self.gameId = int(self.game_settings['last_gen_id'])
+            log(f"read SERVER SETTINGS {self.server_settings}")
 
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # SO_REUSEADDR  is being set to 1(true), if program is restarted TCP socket we created can be used again
@@ -86,9 +88,15 @@ class Server:
             log(f"shutting down server pid={self.pid} with {sig}")
             self.is_server_active = False
             self.game_settings['last_gen_id'] = self.gameId
-            write_file(SERVER_SETTINGS_FILE,
-                       lambda fp: yaml.safe_dump(self.server_settings, fp),
-                       overwrite=True)
+            with open(SERVER_SETTINGS_FILE) as fp:
+                _p_settings = yaml.safe_load(fp)
+                _p_settings['game_settings']['last_gen_id'] = self.game_settings['last_gen_id']
+
+                def write_back(_fp):
+                    log(f"with {_p_settings}")
+                    yaml.safe_dump(_p_settings, _fp)
+
+                write_file(SERVER_SETTINGS_FILE,write_back, overwrite=True)
             self.server_socket.close()  # will generate Bad file descriptor in socket.accept()
         elif sig == signal.SIGKILL:
             self.is_server_active = False
@@ -105,7 +113,7 @@ class Server:
             self.threads_list.append(ct)
 
             while self.is_server_active:
-                log("listening on the server.....")
+                log(f"server is listening on {self.IP}:{self.PORT}.....")
                 client_socket, client_address = self.server_socket.accept()
                 with self.handshake_lock:
                     client_socket.setblocking(True)
@@ -113,6 +121,9 @@ class Server:
                     log(f"[CONNECTION] {client_address} connected!")
                     cs = ClientSocket(client_socket)
                     g, player = self.handshake(cs)
+                    if g is None:
+                        cs.close(self.threads_list)
+                        continue
                     cs.post_handshake(g.game_id, player)
                     self.client_sockets_list.append(cs)
                     # always send the game object as response and then may be other responses.
@@ -172,6 +183,7 @@ class Server:
                 continuous_retries = MAX_RETRY
                 with game.game_mutex:
                     self.handle_client_msg(_cs, decodedP, game, payload)
+                    game.set_server_message(" ")
             except Exception as e:
                 log("unknown error in client handling thread", e)
                 # %%
@@ -196,11 +208,7 @@ class Server:
         log(f"closing client {stringp} connection.")
         self.number_of_usr -= 1
         # connection closed
-        _cs.socket.close()
-        for i in range(len(self.threads_list)):
-            if self.threads_list[i].name == _cs.thread_name:
-                self.threads_list.pop(i)
-                break
+        _cs.close(self.threads_list)
 
     def cleanup_thread(self):
         while not self.cleanup_interval.is_set():
@@ -268,16 +276,21 @@ class Server:
             game.set_server_message(ClientResp.Racks_Ready.msg)
 
         elif ClientMsgReq.Get == client_req:
-            log("[GET]")
             msgs_notified_upto = int(str(data).removeprefix("notifications_received="))
             _q: deque = _cs.player.notify_msg
             while _q.__len__() > 0:
                 n = _q.__iter__().__next__()
                 if n.n_id <= msgs_notified_upto:
                     _popped_m = _cs.player.notify_msg.popleft()
-                    # log(f"SB: discarding notify msg {_popped_m}")
+                    if VERBOSE:
+                        log(f"discarding notify msg {_popped_m}")
                 else:
                     break
+            game.set_server_message(f"{_cs.player}")
+            # if VERBOSE:
+            #     game.set_server_message(f"{ClientResp.GET_RET.msg} {_cs.player}")
+            # else:
+            #     log(f"{ClientResp.GET_RET.msg} {_cs.player}")
 
         elif ClientMsgReq.Buy == client_req:
             try:
@@ -336,16 +349,23 @@ class Server:
         """
         # self.games[_game_id] = current_game
         serverMessage = game.get_server_message()
-        log(f"serverMessage: {serverMessage} ")
+        if len(serverMessage.strip()) > 0:
+            log(f"serverMessage: {serverMessage} ")
         _cs.socket.sendall(serialize(ObjectType.OBJECT, game))
         _cs.set_last_active_ts()
         # game.set_server_message(" ")
 
     def handshake(self, cs: ClientSocket):
+        retries = MAX_RETRY
         while True:
             payload = receive_message(cs.socket, True)
             if not bool(payload):
-                continue
+                if retries > 0:
+                    retries -= 1
+                    continue
+                else:
+                    return None, None
+            retries = MAX_RETRY
             log(f"handshake: received msg: {payload}")
             (msg_enum, data) = payload.split(':')
             client_req: ClientMsgReq = ClientMsgReq.parse_msg_string(msg_enum + ':')

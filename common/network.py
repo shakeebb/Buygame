@@ -38,6 +38,7 @@ from common.utils import receive_message, receive_pickle, serialize, ObjectType
 class Network:
     def __init__(self, ip, port, session_id, player_name):
         log(f"creating {player_name} client socket to {ip}:{port} with {session_id}")
+        self.retries = MAX_RETRY
         self.client: socket = self.create_client_socket()
         self.is_connected = False
         self.server = ip
@@ -91,23 +92,34 @@ class Network:
                 self.is_connected = False
 
     def reconnect(self):
-        with self.con_mutex:
-            try:
-                self.__connect(True)
-                log("client socket created")
-            except Exception as e:
-                log("reconnect failed with", e)
-                self.is_connected = False
+        if self.is_connected:
+            return True
+
+        while self.retries > 0:
+            log(f"Reconnecting {self.retries}")
+            with self.con_mutex:
+                try:
+                    self.__connect(True)
+                    log("client socket created")
+                    self.retries = MAX_RETRY
+                    return True
+                except Exception as e:
+                    if VERBOSE:
+                        log("reconnect failed with", e)
+                    self.is_connected = False
+                    self.retries -= 1
+                    if self.retries <= 0:
+                        raise BrokenPipeError("network:reconnect exhausted", e)
 
     def connect(self) -> Game:
         with self.con_mutex:
             try:
-                log("time to connect")
+                log(f"time to connect {self.addr}")
                 return self.__connect(False)
             except Exception as e:
                 log("failed to connect", e)
                 self.is_connected = False
-                raise e
+                raise
 
     def __connect(self, try_closing: bool) -> Game:
         self.client = self.create_client_socket(try_closing)
@@ -128,15 +140,15 @@ class Network:
                 self.is_connected = True
             return game
         except Exception as e:
-            log("Network:Connect exception: ", e)
+            if VERBOSE:
+                log("Network:Connect exception: ", e)
             self.is_connected = False
+            raise
 
     def send(self, data: str) -> object:
         sleepTime = 0.01
         while True:
-            if not self.is_connected:
-                log("Automatically Reconnecting")
-                self.reconnect()
+            self.reconnect()
 
             with self.con_mutex:
                 try:

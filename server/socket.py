@@ -25,3 +25,11 @@ class ClientSocket:
 
     def mark_inactive(self):
         self.is_active = False
+
+    def close(self, threads_list):
+        # connection closed
+        self.socket.close()
+        for i in range(len(threads_list)):
+            if threads_list[i].name == self.thread_name:
+                threads_list.pop(i)
+                break

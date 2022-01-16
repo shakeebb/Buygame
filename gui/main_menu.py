@@ -3,63 +3,20 @@ Shows the main menu for the game, gets the user name before starting
 """
 import os
 import sys
+import time
+from enum import Enum, auto
 from pathlib import Path
 
 import pygame
 from pygame.locals import *
 
 from common.gameconstants import MAX_NAME_LENGTH, CLIENT_SETTINGS_FILE, CLIENT_SETTINGS_TEMPLATE, Colors, \
-    CLIENT_DEFAULT_SETTINGS_FILE
+    CLIENT_DEFAULT_SETTINGS_FILE, INIT_TILE_SIZE, TILE_ADJ_MULTIPLIER, WelcomeState
 from common.logger import log, logger
 from common.utils import write_file
+from gui.button import TextButton, MessageBox, InputText, RadioButton
 from gui.display import Display
 import yaml
-
-
-class InputText:
-    def __init__(self, x: int, y: int, prompt,
-                 default: str,
-                 in_focus: bool = False):
-        self.prompt = prompt
-        self.text = default
-        self.in_focus = in_focus
-        self.x = x
-        self.y = y
-
-    def set_text(self, txt):
-        if txt is None:
-            return
-        self.text = txt
-
-    def type(self, char):
-        if char == "backspace":
-            if len(self.text) > 0:
-                self.text = self.text[:-1]
-        elif char == "space":
-            self.text += " "
-        elif len(char) == 1:
-            self.text += char
-
-        if len(self.text) >= MAX_NAME_LENGTH:
-            self.text = self.text[:MAX_NAME_LENGTH]
-
-    def begin_input(self):
-        self.in_focus = True
-
-    def end_input(self):
-        self.in_focus = False
-        # self.settings[self.field] = self.text
-
-    def draw(self, win: pygame.Surface):
-        n = Display.name(self.prompt + self.text)
-        if self.in_focus:
-            txt_f = Display.name(self.prompt)
-            _x, _y = (self.x + txt_f.get_width(), self.y + n.get_height())
-            pygame.draw.line(win, Colors.BLACK.value,
-                             (_x, _y),
-                             (_x + n.get_width() - txt_f.get_width(), _y),
-                             3)
-        win.blit(n, (self.x, self.y))
 
 
 class MainMenu:
@@ -67,10 +24,11 @@ class MainMenu:
 
     def __init__(self, user_reset: bool, restore_from_default: bool):
         # self.name = ""
-        self.waiting = False
+        self.wc_state = WelcomeState.INIT
         Display.init()
         self.surface = Display.surface()
         self.controls: [InputText] = []
+        self.user_choices: RadioButton = None
         self.cur_input_field = 0
 
         write_file(CLIENT_DEFAULT_SETTINGS_FILE, lambda _f:
@@ -96,21 +54,41 @@ class MainMenu:
                 log("settings.yaml error ", exc)
                 pygame.quit()
         self.create_screen_layout()
+        self.messagebox = None
+
+    def on_user_choice(self, o: RadioButton.Option):
+        self.controls[0].set_text(o.caption)
 
     def create_screen_layout(self):
         def_usr = ""
         # if we have exactly one user, its safe to assume it.
-        num_usrs = self.game_settings['user_defaults'].keys()
-        if num_usrs.__len__() == 1:
-            def_usr = num_usrs.__iter__().__next__()
+        _users = self.game_settings['user_defaults'].keys()
+        num_usrs = len(_users)
+        if num_usrs == 1:
+            def_usr = _users.__iter__().__next__()
+        elif num_usrs > 1:
+            self.user_choices = RadioButton(800//INIT_TILE_SIZE,
+                                            300//INIT_TILE_SIZE,
+                                            MAX_NAME_LENGTH + 1,
+                                            num_usrs * TILE_ADJ_MULTIPLIER,
+                                            on_display=False,
+                                            on_option_click=self.on_user_choice,
+                                            fill_color=Colors.WHITE)
+            for u in _users:
+                self.user_choices.add_option(u)
+            self.user_choices.show()
 
-        self.controls.append(InputText(200, 400,
+        self.controls.append(InputText(200, 300,
                                        "Type a Name: ",
                                        def_usr,
                                        in_focus=True))
-        self.controls.append(InputText(200, 600,
+        self.controls.append(InputText(200, 400,
                                        "Connect to Server: ",
                                        self.game_settings['server_defaults']['ip']))
+
+        self.controls.append(InputText(200, 500,
+                                       "Connect to Server Port: ",
+                                       self.game_settings['server_defaults']['port']))
 
     def draw(self):
         self.surface.fill(self.BG)
@@ -121,15 +99,20 @@ class MainMenu:
         # self.surface.blit(name, (100, 400))
         for _c in self.controls:
             _c.draw(self.surface)
+        if self.user_choices is not None:
+            self.user_choices.draw(self.surface)
 
-        if self.waiting:
+        if self.wc_state == WelcomeState.INPUT_COMPLETE:
             enter = Display.enter_prompt("In Queue...")
             self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
         else:
             enter = Display.enter_prompt("Press enter to join a game...")
             self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
+        if self.messagebox is not None:
+            self.messagebox.draw(self.surface)
         Display.show()
-        if self.waiting:
+
+        if self.wc_state == WelcomeState.GAME_CONNECT:
             log("done display")
 
     def run(self):
@@ -141,31 +124,68 @@ class MainMenu:
         while run:
             clock.tick(30)
             self.draw()
-            if self.waiting:
+            if self.wc_state == WelcomeState.INPUT_COMPLETE:
                 # response = self.n.send({-1:[]})
                 # if response:
                 #     run = False
-                log("creating GameUI")
-                g = GameUI(self)
-                # for player in response:
-                # p = PlayerGUI(player)
-                # g.players.append(p)
-                g.main()
+                try:
+                    if g is None:
+                        log("creating GameUI")
+                        g = GameUI(self)
+                    # for player in response:
+                    # p = PlayerGUI(player)
+                    # g.players.append(p)
+                    g.handshake()
+                    g.main()
+                except OSError as e:
+                    if self.messagebox is None:
+                        if e.errno == 61:
+                            msg = f"- Server unavailable. Check [{g.ip}:{g.port}] is correct"
+                        else:
+                            msg = f"{e}"
+                        self.messagebox = MessageBox(self.surface.get_width(), self.surface.get_height(),
+                                                     20, 5,
+                                                     msg,
+                                                     "ok",
+                                                     on_ok=lambda : sys.exit(1))
+                        self.messagebox.show()
+                        self.wc_state = WelcomeState.USER_ERR_CONFIRM
+                        # self.wc_state.set_exception(e)
+                    time.sleep(1)
+
+            # %% GameUI delegation end
+
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
+                if event.type == pygame.MOUSEBUTTONUP:
+                    mouse = pygame.mouse.get_pos()
+                    if self.messagebox is not None:
+                        if self.messagebox.button_events(*mouse):
+                            self.messagebox = None
+                            self.wc_state = WelcomeState.QUIT
+                        continue  # modal dialog box.
+
+                    if self.user_choices is not None:
+                        self.user_choices.click(*mouse)
+
+                if event.type == pygame.QUIT or \
+                        (event.type == KEYUP and event.key == K_ESCAPE):
                     run = False
                     pygame.quit()
                     quit()
                 if event.type == VIDEORESIZE:
                     # screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                     Display.resize(event, g.refresh_resolution) if g is not None else None
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pass
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
                         self.controls[self.cur_input_field].end_input()
+                        if self.cur_input_field == 0 and self.user_choices is not None:
+                            self.user_choices.hide()
                         self.cur_input_field += 1
                         if self.cur_input_field >= len(self.controls):
-                            self.waiting = True
-                            log(f"marking end of field entry(s) {self.controls[0].text} {self.controls[1].text}")
+                            self.wc_state = WelcomeState.INPUT_COMPLETE
+                            log(f"marking end of field entry(ies) {self.controls}")
                             continue
                         self.controls[self.cur_input_field].begin_input()
                         # self.n = Network(self.name)
@@ -187,6 +207,7 @@ def main():
     _reset: bool = False
     _restore: bool = False
     user = server = ""
+    port = 0
     import re
     for i in range(len(sys.argv)):
         if re.match("-ur|--user-reset", sys.argv[i].lower().strip()):
@@ -206,10 +227,17 @@ def main():
                 server = sys.argv[i]
             else:
                 server = str(sys.argv[i]).split('=')[1]
+        elif re.match("-p[\b]*|--port=", sys.argv[i].lower().strip()):
+            if sys.argv[i].strip() == "-p":
+                i += 1 if i < len(sys.argv) - 1 else 0
+                port = int(sys.argv[i])
+            else:
+                port = int(sys.argv[i]).split('=')[1]
 
     _main = MainMenu(_reset, _restore)
     _main.controls[0].set_text(user if len(user) > 0 else None)
     _main.controls[1].set_text(server if len(server) > 0 else None)
+    _main.controls[2].set_text(port if port > 0 else None)
     _main.run()
 
 

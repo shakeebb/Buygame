@@ -46,9 +46,9 @@ class Display(pygame.sprite.Sprite):
                       self.surface.get_width(), self.surface.get_height()
                   ))
             self.surface.fill(BG_COLOR.value)
-            self.name_font = pygame.font.SysFont("comicsans", 80)
             self.title_font = pygame.font.SysFont("comicsans", 120)
-            self.enter_font = pygame.font.SysFont("comicsans", 60)
+            self.name_font = pygame.font.SysFont("comicsans", 40)
+            self.enter_font = pygame.font.SysFont("comicsans", 40)
             self.num_h_cells, self.num_v_cells = get_tile_sz(self.win_w, self.win_h, Display.TILE_SIZE)
             max_try = Display.TILE_SIZE / 2
             while True:

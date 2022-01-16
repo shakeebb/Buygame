@@ -7,12 +7,20 @@ Description=Buygame Service
 Type=simple
 User=buygame
 Group=buygame
-BASEBG_PATH=/usr/local/src/buygame
+
 WorkingDirectory=/usr/local/src/buygame
-ExecStart=/usr/local/src/buygame/venv/bin/python3 -m server.server
-# immediately log into systemd logs
-Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/local/src/buygame/venv/bin/python3 -u -m server.server
 Restart=on-failure
+RestartSec=4
+
+Environment=STORAGE_PATH=/home/buygame/file_storage
+#SB: immediately log into systemd logs (-u option now doing it?)
+#Environment=PYTHONUNBUFFERED=1
+
+StandardOutput=file:/var/log/buygame.log
+StandardError=file:/var/log/buygame.log
+SyslogIdentifier=buygame
+
 
 [Install]
 WantedBy=default.target

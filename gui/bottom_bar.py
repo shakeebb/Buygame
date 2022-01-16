@@ -118,22 +118,22 @@ class BottomBar(Display):
 
         if self.__enable_buy:
             if self.help_button.click(*mouse):
-                self.game.game_status = GameUIStatus.BUY
+                self.game.ui_game_status = GameUIStatus.BUY
                 self.hide_all()
                 return
             elif self.remove_button.click(*mouse):
                 self.__enable_buy = False
-                self.game.game_status = GameUIStatus.CANCEL_BUY
+                self.game.ui_game_status = GameUIStatus.CANCEL_BUY
                 self.hide_all()
                 return
 
         if self.__enable_sell:
             if self.help_button.click(*mouse):
-                self.game.game_status = GameUIStatus.SELL
+                self.game.ui_game_status = GameUIStatus.SELL
                 self.hide_all()
                 return
             elif self.remove_button.click(*mouse):
-                self.game.game_status = GameUIStatus.CANCEL_SELL
+                self.game.ui_game_status = GameUIStatus.CANCEL_SELL
                 self.hide_all()
                 return
 
@@ -165,7 +165,7 @@ class BottomBar(Display):
         self.game.top_bar.client_msgs.add_msg("Your Choice. Enter between 2 to 5")
         self.help_button.set_text(" Choose ")
         self.option_button.show()
-        self.game.game_status = GameUIStatus.PROMPT_DICE_INPUT
+        self.game.ui_game_status = GameUIStatus.PROMPT_DICE_INPUT
         # enable input field & validate
         # return random.randint(2, 5)
 
@@ -180,7 +180,7 @@ class BottomBar(Display):
         self.last_rolled_dice_no = dice_value
         self.__enable_dice_rolling = False
         self.dice = None
-        self.game.game_status = GameUIStatus.DICE_ROLL_COMPLETE
+        self.game.ui_game_status = GameUIStatus.DICE_ROLL_COMPLETE
         self.hide_all()
 
     def enable_dice_rolling(self):

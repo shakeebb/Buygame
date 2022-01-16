@@ -11,6 +11,7 @@ from pygame.surface import Surface
 import common
 from common.client_utils import ClientUtils
 from gui.bottom_bar import BottomBar
+from gui.button import MessageBox
 from gui.chat import Chat
 from common import network
 from common.game import *
@@ -34,7 +35,8 @@ class GameUI:
         self.player_name = self.main_menu.controls[0].text
         input_ip = self.main_menu.controls[1].text
         self.ip = input_ip if len(input_ip) > 0 else self.server_settings['ip']
-        self.port = self.server_settings['port']
+        input_port = self.main_menu.controls[2].text
+        self.port = int(input_port) if int(input_port) > 0 else int(self.server_settings['port'])
 
         if self.player_name not in dict(usr_defs):
             usr_defs[self.player_name] = {}
@@ -48,20 +50,12 @@ class GameUI:
 
         self.surface = Display.surface()
 
-        xx = [
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [.5, 0, 0, 1, 1, 1, 0, 0, 0, 1],
-            [.5, 0, 1, 1, 1, 1, 1, 1, 0, 1],
-            [0, 0, 0, 0, 1, 0, 0, 0, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-        ]
-
         self.top_bar = TopBar(0.5, 0.5,
-                              width_cells=Display.num_horiz_cells() - (1*TILE_ADJ_MULTIPLIER),
+                              width_cells=Display.num_horiz_cells() - (1 * TILE_ADJ_MULTIPLIER),
                               height_cells=4 * TILE_ADJ_MULTIPLIER)
 
         def h_percent(p: int):
-            return Display.num_horiz_cells() * (p*.01)
+            return Display.num_horiz_cells() * (p * .01)
 
         self.leaderboard = Leaderboard(0.5,
                                        self.top_bar.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
@@ -104,16 +98,16 @@ class GameUI:
         # self.bag = Bag(self.leaderboard.xmargin() / 3, self.leaderboard.ymargin() + 1, 2)
         self.bottom_bar = BottomBar(0.5,
                                     self.leaderboard.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
-                                    width_cells=(self.message_box.h_margin_cells - (1*TILE_ADJ_MULTIPLIER)),
+                                    width_cells=(self.message_box.h_margin_cells - (1 * TILE_ADJ_MULTIPLIER)),
                                     height_cells=(Display.num_vert_cells() - self.leaderboard.ymargin()
-                                                  - (2*TILE_ADJ_MULTIPLIER)),
+                                                  - (2 * TILE_ADJ_MULTIPLIER)),
                                     game=self)
 
         self.chat = Chat(self.message_box.h_margin_cells,
                          self.bottom_bar.v_margin_cells,
                          h_percent(10 * TILE_ADJ_MULTIPLIER),
                          Display.num_vert_cells() - self.bottom_bar.v_margin_cells
-                         - (1*TILE_ADJ_MULTIPLIER),
+                         - (1 * TILE_ADJ_MULTIPLIER),
                          self)
 
         self.myrack = Inventory(self.bottom_bar.h_margin_cells + 5,
@@ -134,11 +128,12 @@ class GameUI:
         path = os.path.dirname(__file__)
         self.tiles_sheet = SpriteSheet(os.path.join(path, "tiles", "all_tiles.png"))
         self.sprite_tiles: list[list[Surface]] = self.tiles_sheet.crop_out_sprites()
-        self.game_status = GameUIStatus.INITIAL_STATE
+        self.ui_game_status = GameUIStatus.INITIAL_STATE
         self.hb_thread = Thread(target=self.heartbeat, name="heartbeat", daemon=True)
         self.hb_event = Event()
         self.last_notification_received = 0
         self.current_round = -1
+        self.alert_boxes = []
 
     def quit(self):
         self.main_menu.save_gamesettings()
@@ -177,6 +172,8 @@ class GameUI:
         for __i in [self.inventory, self.myrack, self.extrarack, self.temp_rack]:
             tile_grp(__i)
         # self.tileList.draw(self.surface)
+        if len(self.alert_boxes) > 0:
+            self.alert_boxes[0].draw(self.surface)
 
         Display.display_grid()
         Display.show()
@@ -186,7 +183,7 @@ class GameUI:
         self.leaderboard.refresh_dims()
         self.inventory.refresh_dims()
         self.chat.refresh_dims()
-        self.bag.refresh_dims()
+        # self.bag.refresh_dims()
         self.bottom_bar.refresh_dims()
         self.myrack.refresh_dims()
         self.extrarack.refresh_dims()
@@ -277,16 +274,23 @@ class GameUI:
         pygame.display.set_caption('beta version BuyGame')
         logger.reset()
 
-        self.handshake()
+        # now happens in the main_menu.
+        # self.handshake()
 
         pygame.event.clear()
         selected = None
         self.hb_thread.start()
 
         while True:  # main game loop
-            letter = chr(random.randint(65, 90))
-            mouseClicked = False
             for event in pygame.event.get():  # event handling loop
+                # check alert boxes at first. modal windows
+                if len(self.alert_boxes) > 0:
+                    if event.type == KEYUP and event.key == K_ESCAPE:
+                        self.alert_boxes[0].destroy()
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        self.alert_boxes[0].button_events(*pygame.mouse.get_pos())
+                    continue
+
                 if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
                     self.quit()
                     pygame.quit()
@@ -300,11 +304,10 @@ class GameUI:
                     self.bottom_bar.roll_dice()
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pos = pygame.mouse.get_pos()
-                    x, y = pos
                     selected = self.check_clicks()
-                    self.top_bar.button_events()
-                    self.bottom_bar.button_events()
+                    if selected is None:
+                        self.top_bar.button_events()
+                        self.bottom_bar.button_events()
                     # if event.button == 1:
                     #     boxpos = self.inventory.Get_pos()
                     #     if self.inventory.In_grid(boxpos[0], boxpos[1]):
@@ -352,8 +355,11 @@ class GameUI:
 
             # ---------------------------
             # %% end of event loop
-            # ---------------------------
+            # --------------------------
+            prev_state = self.ui_game_status
             self.handle_gaming_events()
+            if prev_state != self.ui_game_status:
+                log(f"fsm state change {prev_state} -> {self.ui_game_status}")
 
             def update_tile_pos(tiles):
                 for __tile in tiles:
@@ -407,7 +413,7 @@ class GameUI:
 
             # %% end of process_rack
 
-            ClientUtils.receive_racks(player, self.game_status, self.my_player_number,
+            ClientUtils.receive_racks(player, self.ui_game_status, self.my_player_number,
                                       self.server_notify,
                                       self.client_notify,
                                       self.messagebox_notify,
@@ -427,20 +433,47 @@ class GameUI:
         for n in self.me().notify_msg:
             if n.n_id <= self.last_notification_received:
                 continue
+            alert_box = False
+            color = Colors.BLACK
+            if n.n_type == NotificationType.ERR:
+                color = Colors.RED
+                alert_box = True
+            elif n.n_type == NotificationType.WARN:
+                color = Colors.ORANGE
+                alert_box = True
+            elif n.n_type == NotificationType.INFO:
+                color = Colors.NAVY_BLUE
+            elif n.n_type == NotificationType.ACT_1:
+                color = Colors.GREEN
+            elif n.n_type == NotificationType.ACT_2:
+                color = Colors.DIRTY_YELLOW
             # log(f"SB: adding notify {n.get_msg()}")
-            self.messagebox_notify(n.get_msg())
+            self.messagebox_notify(n.get_msg(), color, is_an_alert=alert_box)
             last_notification = n
 
         if last_notification is not None:
             self.last_notification_received = last_notification.n_id
 
-    def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK):
-        self.message_box.add_msg(msg, color)
+    def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK, is_an_alert=False):
+        for m in msg.split(NL_DELIM):
+            if m[0] == '-':
+                self.message_box.add_msg(m, color)
+            else:
+                self.message_box.add_msg('  ' + m, color)
+
+        if color == Colors.RED or is_an_alert:
+            self.alert_boxes.append(MessageBox(self.surface.get_width(),
+                                               self.surface.get_height(),
+                                               20, 5,
+                                               msg,
+                                               "ok",
+                                               in_display=True,
+                                               on_ok=lambda: self.alert_boxes.pop(0)))
 
     def check_round_complete(self):
-        (self.game_status, r, _g_obj) = ClientUtils.round_done(self.top_bar.round, self.network,
-                                                               self.client_notify,
-                                                               self.messagebox_notify)
+        (self.ui_game_status, r, _g_obj) = ClientUtils.round_done(self.top_bar.round, self.network,
+                                                                  self.client_notify,
+                                                                  self.messagebox_notify)
         self.set_game(_g_obj)
         self.top_bar.change_round(r)
 
@@ -448,6 +481,7 @@ class GameUI:
         assert isinstance(_g, Game)
         self.__game = _g
         self.leaderboard.players = self.__game.players()
+        self.top_bar.set_connection_status(self.me())
         self.top_bar.server_msg.set_text(self.__game.get_server_message())
         self.process_server_notifications()
         if self.current_round < self.__game.round:
@@ -460,8 +494,7 @@ class GameUI:
         if self.current_round != -1:
             self.top_bar.client_msgs.add_msg(f"UI: moving from round {self.current_round} to {self.__game.round}")
         self.current_round = self.__game.round
-        self.game_status = GameUIStatus.PLAY
-        self.top_bar.set_connection_status(Colors.GREEN)
+        self.ui_game_status = GameUIStatus.PLAY
         self.top_bar.round = self.current_round
         self.bottom_bar.hide_all()
         self.refresh_inventory(True)
@@ -469,23 +502,27 @@ class GameUI:
     def game(self) -> Game:
         return self.__game
 
-    def check_sell_again(self):
-        if self.game_status == GameUIStatus.SELL_AGAIN:
+    def set_iplayed(self, txn_state: Txn):
+        if txn_state == Txn.SOLD_SELL_AGAIN \
+                or txn_state == Txn.SELL_CANCELLED_SELL_AGAIN\
+                or txn_state == Txn.NO_SELL:
             self.bottom_bar.enable_sell()
-            self.game_status = GameUIStatus.ENABLE_SELL
             remaining = self.me().get_remaining_letters()
             self.messagebox_notify(f"Sell atleast {remaining} letter(s).", Colors.RED)
             self.refresh_inventory(True)
-        elif self.game_status == GameUIStatus.SOLD:
-            self.game_status = GameUIStatus.I_PLAYED
-        elif self.game_status == GameUIStatus.SELL_FAILED:
-            self.game_status = GameUIStatus.I_PLAYED
+            self.ui_game_status = GameUIStatus.ENABLE_SELL
+        else:
+            log(f"Marking end of round {self.game().round}")
+            self.ui_game_status = GameUIStatus.PLAY
+            self.bottom_bar.hide_all()
+            self.refresh_inventory(True)
 
     def handshake(self):
         try:
             self.network = network.Network(self.ip, self.port, self.session_id, self.player_name)
             game = self.network.connect()
-            log("we connected to network - session id: " + self.network.session_id)
+            log("connected to network - session id: " + self.network.session_id)
+
             self.set_game(game)
             new_session_id = self.network.session_id
 
@@ -512,21 +549,14 @@ class GameUI:
             self.set_game(game)
             self.leaderboard.players = self.game().players()
             self.top_bar.gameui = self
-            cs = self.me().player_state
-            if cs == PlayerState.WAIT or cs == PlayerState.INIT:
-                self.game_status = GameUIStatus.WAIT_START
-                # self.messagebox_notify(game.get_server_message())
-                self.top_bar.set_connection_status(Colors.YELLOW)
-            else:
-                self.game_status = GameUIStatus.PLAY
-                self.top_bar.set_connection_status(Colors.GREEN)
             for n in self.me().notify_msg:
                 self.messagebox_notify(n.get_msg())
             self.refresh_inventory()
         except Exception as e:
             log("gui initialization failed with ", e)
             log("Couldn't connect")
-            sys.exit("Cant connect to host")
+            raise
+            # sys.exit("Cant connect to host")
 
     def me(self) -> Player:
         return self.game().players()[self.my_player_number]
@@ -534,20 +564,20 @@ class GameUI:
     def handle_gaming_events(self):
         current_state = self.me().player_state
         if current_state == PlayerState.WAIT or current_state == PlayerState.INIT:
-            return
+            if self.ui_game_status != GameUIStatus.INITIAL_STATE:
+                return
 
-        assert current_state == PlayerState.PLAY
+        # assert current_state == PlayerState.PLAY, f"found {current_state}"
 
         game_state = self.game().game_state
-
+        txn_state = self.me().txn_status
         if game_state == GameState.ROLL:
-            if self.game_status.value < GameUIStatus.ROLL_DICE.value:
-                self.game_status = GameUIStatus.ROLL_DICE
+            if self.ui_game_status.value < GameUIStatus.ROLL_DICE.value:
+                self.ui_game_status = GameUIStatus.ROLL_DICE
                 self.bottom_bar.enable_dice_rolling()
                 return
 
-            if self.game_status == GameUIStatus.DICE_ROLL_COMPLETE:
-                assert self.game_status == GameUIStatus.DICE_ROLL_COMPLETE, f"{self.game_status}"
+            if self.ui_game_status == GameUIStatus.DICE_ROLL_COMPLETE:
                 diceValue = str(self.bottom_bar.last_rolled_dice_no)
                 diceMessage: str = ClientMsgReq.Dice.msg + diceValue
                 try:
@@ -560,97 +590,95 @@ class GameUI:
             return
 
         elif game_state == GameState.BUY:
-            if self.game_status.value <= GameUIStatus.ENABLE_BUY.value:
-                self.bottom_bar.enable_buy()
-                self.refresh_inventory()
-                self.game_status = GameUIStatus.BUY_ENABLED
-                return
-            elif self.game_status == GameUIStatus.BUY_ENABLED:
+            if self.ui_game_status == GameUIStatus.BUY_ENABLED:
                 return
 
-            self.refresh_inventory()
-            if self.game_status == GameUIStatus.BUY:
+            if self.ui_game_status == GameUIStatus.BUY:
                 try:
-                    (self.game_status, _g_obj) = ClientUtils.buy_tiles(self.game(), self.network,
-                                                                       self.my_player_number,
-                                                                       self.server_notify,
-                                                                       self.client_notify,
-                                                                       self.messagebox_notify)
+                    (_, _g_obj) = ClientUtils.buy_tiles(self.game(), self.network,
+                                                        self.my_player_number,
+                                                        self.server_notify,
+                                                        self.client_notify,
+                                                        self.messagebox_notify)
                     self.set_game(_g_obj)
                 except Exception as e:
                     log("buy failed", e)
-
-            elif self.game_status == GameUIStatus.CANCEL_BUY:
-                (self.game_status, _g_obj) = ClientUtils.cancel_buy(self.game(), self.network,
-                                                                    self.server_notify,
-                                                                    self.client_notify)
-                self.set_game(_g_obj)
-            else:
                 self.bottom_bar.hide_all()
+                self.refresh_inventory()
+                return
 
-            self.refresh_inventory()
+            elif self.ui_game_status == GameUIStatus.CANCEL_BUY:
+                (_, _g_obj) = ClientUtils.cancel_buy(self.game(), self.network,
+                                                     self.server_notify,
+                                                     self.client_notify)
+                self.set_game(_g_obj)
+                self.bottom_bar.hide_all()
+                self.refresh_inventory()
+                return
+
+            if txn_state == Txn.NO_BUY:
+                self.bottom_bar.hide_all()
+                self.refresh_inventory()
+                self.ui_game_status = GameUIStatus.BUY_ENABLED
+                return
+            elif txn_state == Txn.ROLLED:
+                self.bottom_bar.enable_buy()
+                self.refresh_inventory()
+                self.ui_game_status = GameUIStatus.BUY_ENABLED
+                return
+
             # %% end of server side BUY handling
             return
 
         elif game_state == GameState.SELL:
-            if self.game_status.value <= GameUIStatus.ENABLE_SELL.value:
-                self.bottom_bar.enable_sell()
-                self.refresh_inventory(True)
-                self.game_status = GameUIStatus.SELL_ENABLED
-                return
-            elif self.game_status == GameUIStatus.SELL_ENABLED:
+            if self.ui_game_status == GameUIStatus.SELL_ENABLED:
                 return
 
-            if self.game_status == GameUIStatus.SELL:
+            if self.ui_game_status == GameUIStatus.SELL:
                 if len(self.top_bar.word) == 0:
-                    self.messagebox_notify("Cannot sell a blank word", Colors.RED)
-                    self.game_status = GameUIStatus.ENABLE_SELL
+                    self.messagebox_notify("- Cannot sell a blank word", Colors.RED)
+                    self.ui_game_status = GameUIStatus.ENABLE_SELL
                     return
+
+                num_wild_cards = len(self.top_bar.word.split(WILD_CARD))
+                if num_wild_cards > 2:
+                    msg = f"- You cannot have {num_wild_cards} wild cards" \
+                          f"{NL_DELIM}in a word, only 1 allowed."
+                    self.messagebox_notify(msg, Colors.RED)
+                    self.ui_game_status = GameUIStatus.ENABLE_SELL
+                    return
+
                 try:
-                    (self.game_status, _g_obj) = ClientUtils.sell_word(self.game(), self.network,
-                                                                       self.my_player_number,
-                                                                       self.top_bar.word,
-                                                                       self.server_notify,
-                                                                       self.client_notify,
-                                                                       self.messagebox_notify)
+                    (_, _g_obj) = ClientUtils.sell_word(self.game(), self.network,
+                                                        self.my_player_number,
+                                                        self.top_bar.word,
+                                                        self.server_notify,
+                                                        self.client_notify,
+                                                        self.messagebox_notify)
                     self.set_game(_g_obj)
                 except Exception as e:
                     log("sell word failed", e)
+                self.set_iplayed(self.me().player_state)
+                return
 
-            elif self.game_status == GameUIStatus.CANCEL_SELL:
+            elif self.ui_game_status == GameUIStatus.CANCEL_SELL:
                 (g_status, _g_obj) = ClientUtils.cancel_sell(self.network, self.server_notify, self.client_notify)
                 if g_status is not None:
-                    self.game_status = g_status
+                    self.ui_game_status = g_status
                     self.set_game(_g_obj)
+                # self.check_sell_again()
+                # %% end of server side SELL handling
+                self.set_iplayed(self.me().player_state)
+                return
 
-            self.check_sell_again()
-            # %% end of server side SELL handling
+        if self.ui_game_status.value < GameUIStatus.SELL_ENABLED.value:
+            self.bottom_bar.enable_sell()
+            self.refresh_inventory(True)
+            self.ui_game_status = GameUIStatus.SELL_ENABLED
             return
 
-        """
-        if self.game_status == GameStatus.PLAY or self.game_status == GameStatus.WAIT_TURN:
-            self.game_status = ClientUtils.check_game_events(self.game(),
-                                                             self.my_player_number,
-                                                             self.game_status,
-                                                             self.server_notify,
-                                                             self.messagebox_notify)
-
-        if self.game_status == GameStatus.RECEIVE_RACKS:
-            self.refresh_inventory()
-            self.game_status = GameStatus.ENABLE_BUY
-
-        if self.game_status == GameUIStatus.ENABLE_SELL:
-            self.bottom_bar.enable_sell()
-            self.messagebox_notify("Create a word to sell")
-            self.game_status = GameUIStatus.SELL_ENABLED
-
-        if self.game_status == GameUIStatus.I_PLAYED:
-            (self.game_status, _g_obj) = ClientUtils.i_played(self.top_bar.round, self.network)
-            self.set_game(_g_obj)
-
-        if self.game_status == GameUIStatus.TURN_COMPLETE:
-            self.check_round_complete()
-        """
+        return
+        # %% end of server side SELL handling
 
 
 class SpriteSheet:
@@ -763,4 +791,5 @@ if __name__ == "__main__":
     mm = MainMenu(False, False)
     mm.controls[0].text = sys.argv[1]
     gui = GameUI(mm)
+    gui.handshake()
     gui.main()

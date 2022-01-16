@@ -116,7 +116,10 @@ class TextButton(Button):
 
 class RadioButton(Button):
 
-    def __init__(self, x, y, width, height, on_display=True, text_offset=(28, 1),
+    def __init__(self, x, y, width, height,
+                 on_option_click=None,
+                 on_display=True,
+                 text_offset=(28, 1),
                  fill_color: Colors = Colors.LTR_GRAY,
                  font_color: Colors = Colors.BLACK,
                  border_color: Colors = Colors.BLACK,
@@ -136,6 +139,7 @@ class RadioButton(Button):
         self.options: [RadioButton.Option] = []
         self.on_display = on_display
         self.last_chosen_option: RadioButton.Option = None
+        self.on_option_click = on_option_click
 
     class Option:
         def __init__(self, radio, x, y, idnum, caption=""):
@@ -212,10 +216,13 @@ class RadioButton(Button):
                 for de_sel in self.options:
                     de_sel.mark_unchecked() if de_sel.idnum != o.idnum else None
                 self.last_chosen_option = o
+                if self.on_option_click is not None:
+                    self.on_option_click(o)
                 break
 
     def add_option(self, txt):
-        self.options.append(RadioButton.Option(self, self.x, self.y, caption=txt, idnum=len(self.options)))
+        self.options.append(RadioButton.Option(self, self.x, self.y, caption=txt,
+                                               idnum=len(self.options)))
         self.options[0].mark_checked()
 
     def show(self):
@@ -236,3 +243,130 @@ class RadioButton(Button):
 
     def get_chosen_option_value(self) -> int:
         return self.last_chosen_option.idnum if self.last_chosen_option is not None else -1
+
+
+class MessageBox(pygame.sprite.Sprite):
+    MAX_LINE_LENGTH = 50
+
+    def __init__(self, parent_width: int, parent_height: int, width: int, height: int,
+                 msg: str,
+                 ok_text: str,
+                 in_display: bool = False, on_ok=None, color = Colors.RED):
+        super(MessageBox, self).__init__()
+        self.font = pygame.font.SysFont("comicsans", 17)
+        self.f_color = color
+
+        _msgs = []
+        oneliner = ""
+        # get rid of the hyphen prefix
+        self.orig_msg = msg[1:]
+        for m in self.orig_msg.split(NL_DELIM):
+            if len(m) <= 0:
+                continue
+            if len(oneliner) > MessageBox.MAX_LINE_LENGTH:
+                _msgs.append(self.font.render(oneliner, True, self.f_color.value))
+                oneliner = m
+                continue
+            oneliner += ' ' + m
+        # add the residual last line
+        _msgs.append(self.font.render(oneliner, True, self.f_color.value))
+
+        self.msgs = _msgs
+        self.in_display = in_display
+        self.w = (width * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE)
+        self.h = (height * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE)
+        self.x = (parent_width - self.w) // 2
+        self.y = (parent_height - self.h) // 2
+        self.fc = Colors.WHITE
+        self.bc = Colors.NAVY_BLUE
+
+        r_m = self.msgs[0]
+        self.l_x = self.x + (self.w - r_m.get_width())/2
+        self.l_y = self.y + ((self.h - r_m.get_height()) * 1/4)
+
+        t_w = 3 * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE
+        t_h = 1 * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE
+        mid_x = self.x + (self.w - t_w)/2
+        bottom_y = self.y + ((self.h - t_h)*3/4)
+        self.ok_button = TextButton(mid_x//INIT_TILE_SIZE,
+                                    bottom_y//INIT_TILE_SIZE,
+                                    t_w//INIT_TILE_SIZE, t_h//INIT_TILE_SIZE,
+                                    Colors.YELLOW, ok_text,
+                                    Colors.YELLOW)
+        self.on_ok = on_ok
+
+    def show(self):
+        self.in_display = True
+
+    def destroy(self):
+        self.in_display = False
+        if self.on_ok is not None:
+            self.on_ok()
+
+    def button_events(self, x, y):
+        if self.ok_button.click(x, y):
+            self.in_display = False
+            if self.on_ok is not None:
+                self.on_ok()
+            return True
+
+        return False
+
+    def draw(self, win: pygame.Surface):
+        # if self.in_display:
+        pygame.draw.rect(win, self.fc.value, (self.x, self.y, self.w, self.h), 0)
+        pygame.draw.rect(win, self.bc.value, (self.x, self.y, self.w, self.h), 1)
+        for i, s in enumerate(self.msgs):
+            win.blit(s, (self.l_x, self.l_y + (i * 10 * TILE_ADJ_MULTIPLIER)))
+        self.ok_button.draw(win)
+
+
+class InputText:
+    def __init__(self, x: int, y: int, prompt,
+                 default: str,
+                 in_focus: bool = False):
+        self.prompt = prompt
+        self.text = default
+        self.in_focus = in_focus
+        self.x = x
+        self.y = y
+
+    def __repr__(self):
+        return self.text
+
+    def set_text(self, txt):
+        if txt is None:
+            return
+        self.text = txt
+
+    def type(self, char):
+        if char == "backspace":
+            if len(self.text) > 0:
+                self.text = self.text[:-1]
+        elif char == "space":
+            self.text += " "
+        elif len(char) == 1:
+            self.text += char
+
+        if len(self.text) >= MAX_NAME_LENGTH:
+            self.text = self.text[:MAX_NAME_LENGTH]
+
+    def begin_input(self):
+        self.in_focus = True
+
+    def end_input(self):
+        self.in_focus = False
+        # self.settings[self.field] = self.text
+
+    def draw(self, win: pygame.Surface):
+        n = Display.name(self.prompt + self.text)
+        if self.in_focus:
+            txt_f = Display.name(self.prompt)
+            _x, _y = (self.x + txt_f.get_width(), self.y + n.get_height())
+            pygame.draw.line(win, Colors.BLACK.value,
+                             (_x, _y),
+                             (_x + n.get_width() - txt_f.get_width(), _y),
+                             3)
+        win.blit(n, (self.x, self.y))
+
+
