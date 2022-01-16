@@ -3,15 +3,18 @@ Shows the main menu for the game, gets the user name before starting
 """
 import os
 import sys
+import time
+from enum import Enum, auto
 from pathlib import Path
 
 import pygame
 from pygame.locals import *
 
 from common.gameconstants import MAX_NAME_LENGTH, CLIENT_SETTINGS_FILE, CLIENT_SETTINGS_TEMPLATE, Colors, \
-    CLIENT_DEFAULT_SETTINGS_FILE
+    CLIENT_DEFAULT_SETTINGS_FILE, INIT_TILE_SIZE, TILE_ADJ_MULTIPLIER
 from common.logger import log, logger
 from common.utils import write_file
+from gui.button import TextButton
 from gui.display import Display
 import yaml
 
@@ -65,12 +68,81 @@ class InputText:
         win.blit(n, (self.x, self.y))
 
 
+class MessageBox(pygame.sprite.Sprite):
+    def __init__(self, parent_width: int, parent_height: int, width: int, height: int,
+                 msg: str,
+                 ok_text: str,
+                 in_display: bool = False, on_ok=None):
+        super(MessageBox, self).__init__()
+        self.msg = pygame.font.SysFont("comicsans", 17).render(msg, True, Colors.RED.value)
+        self.in_display = in_display
+        self.w = (width * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE)
+        self.h = (height * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE)
+        self.x = (parent_width - self.w) // 2
+        self.y = (parent_height - self.h) // 2
+        self.fc = Colors.WHITE
+        self.bc = Colors.NAVY_BLUE
+
+        self.l_x = self.x + (self.w - self.msg.get_width())/2
+        self.l_y = self.y + ((self.h - self.msg.get_height()) * 1/4)
+
+        t_w = 3 * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE
+        t_h = 1 * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE
+        mid_x = self.x + (self.w - t_w)/2
+        bottom_y = self.y + ((self.h - t_h)*3/4)
+        self.ok_button = TextButton(mid_x//INIT_TILE_SIZE,
+                                    bottom_y//INIT_TILE_SIZE,
+                                    t_w//INIT_TILE_SIZE, t_h//INIT_TILE_SIZE,
+                                    Colors.YELLOW, ok_text,
+                                    Colors.YELLOW)
+        self.on_ok = on_ok
+
+    def show(self):
+        self.in_display = True
+
+    def button_events(self, x, y):
+        if self.ok_button.click(x, y):
+            self.in_display = False
+            if self.on_ok is not None:
+                self.on_ok()
+            return True
+
+        return False
+
+    def draw(self, win: pygame.Surface):
+        # if self.in_display:
+        pygame.draw.rect(win, self.fc.value, (self.x, self.y, self.w, self.h), 0)
+        pygame.draw.rect(win, self.bc.value, (self.x, self.y, self.w, self.h), 1)
+        win.blit(self.msg, (self.l_x, self.l_y))
+        self.ok_button.draw(win)
+
+
+class WelcomeState(Enum):
+    INIT = auto()
+    INPUT_COMPLETE = auto()
+    GAME_CONNECT = auto()
+    USER_ERR_CONFIRM = auto()
+    QUIT = auto()
+
+    # def __init__(self):
+    #     self.__e = None
+
+    # def set_exception(self, exception):
+    #     self.__e = exception
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return f"wc={self.__repr__()}"
+
+
 class MainMenu:
     BG = (255, 255, 255)
 
     def __init__(self, user_reset: bool, restore_from_default: bool):
         # self.name = ""
-        self.waiting = False
+        self.wc_state = WelcomeState.INIT
         Display.init()
         self.surface = Display.surface()
         self.controls: [InputText] = []
@@ -99,6 +171,7 @@ class MainMenu:
                 log("settings.yaml error ", exc)
                 pygame.quit()
         self.create_screen_layout()
+        self.messagebox = None
 
     def create_screen_layout(self):
         def_usr = ""
@@ -129,14 +202,17 @@ class MainMenu:
         for _c in self.controls:
             _c.draw(self.surface)
 
-        if self.waiting:
+        if self.wc_state == WelcomeState.INPUT_COMPLETE:
             enter = Display.enter_prompt("In Queue...")
             self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
         else:
             enter = Display.enter_prompt("Press enter to join a game...")
             self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
+        if self.messagebox is not None:
+            self.messagebox.draw(self.surface)
         Display.show()
-        if self.waiting:
+
+        if self.wc_state == WelcomeState.GAME_CONNECT:
             log("done display")
 
     def run(self):
@@ -148,30 +224,61 @@ class MainMenu:
         while run:
             clock.tick(30)
             self.draw()
-            if self.waiting:
+            if self.wc_state == WelcomeState.INPUT_COMPLETE:
                 # response = self.n.send({-1:[]})
                 # if response:
                 #     run = False
-                log("creating GameUI")
-                g = GameUI(self)
-                # for player in response:
-                # p = PlayerGUI(player)
-                # g.players.append(p)
-                g.main()
+                try:
+                    if g is None:
+                        log("creating GameUI")
+                        g = GameUI(self)
+                    # for player in response:
+                    # p = PlayerGUI(player)
+                    # g.players.append(p)
+                    g.handshake()
+                    g.main()
+                except OSError as e:
+                    if self.messagebox is None:
+                        if e.errno == 61:
+                            msg = f"Server unavailable. Check [{g.ip}:{g.port}] is correct"
+                        else:
+                            msg = f"{e}"
+                        self.messagebox = MessageBox(self.surface.get_width(), self.surface.get_height(),
+                                                     20, 5,
+                                                     msg,
+                                                     "ok",
+                                                     on_ok=lambda : sys.exit(1))
+                        self.messagebox.show()
+                        self.wc_state = WelcomeState.USER_ERR_CONFIRM
+                        # self.wc_state.set_exception(e)
+                    time.sleep(1)
+
+            # %% GameUI delegation end
+
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
+                if self.messagebox is not None:
+                    if event.type == pygame.MOUSEBUTTONUP:
+                        mouse = pygame.mouse.get_pos()
+                        if self.messagebox.button_events(*mouse):
+                            self.messagebox = None
+                            self.wc_state = WelcomeState.QUIT
+                    continue  # modal dialog box.
+                if event.type == pygame.QUIT or \
+                        event.type == pygame.K_ESCAPE:
                     run = False
                     pygame.quit()
                     quit()
                 if event.type == VIDEORESIZE:
                     # screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                     Display.resize(event, g.refresh_resolution) if g is not None else None
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pass
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
                         self.controls[self.cur_input_field].end_input()
                         self.cur_input_field += 1
                         if self.cur_input_field >= len(self.controls):
-                            self.waiting = True
+                            self.wc_state = WelcomeState.INPUT_COMPLETE
                             log(f"marking end of field entry(ies) {self.controls}")
                             continue
                         self.controls[self.cur_input_field].begin_input()

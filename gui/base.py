@@ -270,7 +270,8 @@ class GameUI:
         pygame.display.set_caption('beta version BuyGame')
         logger.reset()
 
-        self.handshake()
+        # now happens in the main_menu.
+        # self.handshake()
 
         pygame.event.clear()
         selected = None
@@ -349,7 +350,7 @@ class GameUI:
             prev_state = self.ui_game_status
             self.handle_gaming_events()
             if prev_state != self.ui_game_status:
-                log(f"SB: fsm state change {prev_state} -> {self.ui_game_status}")
+                log(f"fsm state change {prev_state} -> {self.ui_game_status}")
 
             def update_tile_pos(tiles):
                 for __tile in tiles:
@@ -442,7 +443,7 @@ class GameUI:
             self.last_notification_received = last_notification.n_id
 
     def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK):
-        for m in msg.split('\n'):
+        for m in msg.split(NL_DELIM):
             if m[0] == '-':
                 self.message_box.add_msg(m, color)
             else:
@@ -459,6 +460,7 @@ class GameUI:
         assert isinstance(_g, Game)
         self.__game = _g
         self.leaderboard.players = self.__game.players()
+        self.top_bar.set_connection_status(self.me())
         self.top_bar.server_msg.set_text(self.__game.get_server_message())
         self.process_server_notifications()
         if self.current_round < self.__game.round:
@@ -472,7 +474,6 @@ class GameUI:
             self.top_bar.client_msgs.add_msg(f"UI: moving from round {self.current_round} to {self.__game.round}")
         self.current_round = self.__game.round
         self.ui_game_status = GameUIStatus.PLAY
-        self.top_bar.set_connection_status(Colors.GREEN)
         self.top_bar.round = self.current_round
         self.bottom_bar.hide_all()
         self.refresh_inventory(True)
@@ -488,7 +489,7 @@ class GameUI:
             self.refresh_inventory(True)
             self.ui_game_status = GameUIStatus.ENABLE_SELL
         else:
-            log(f"SB: Marking end of round {self.game().round}")
+            log(f"Marking end of round {self.game().round}")
             self.ui_game_status = GameUIStatus.PLAY
             self.bottom_bar.hide_all()
             self.refresh_inventory(True)
@@ -497,7 +498,8 @@ class GameUI:
         try:
             self.network = network.Network(self.ip, self.port, self.session_id, self.player_name)
             game = self.network.connect()
-            log("we connected to network - session id: " + self.network.session_id)
+            log("connected to network - session id: " + self.network.session_id)
+
             self.set_game(game)
             new_session_id = self.network.session_id
 
@@ -524,21 +526,14 @@ class GameUI:
             self.set_game(game)
             self.leaderboard.players = self.game().players()
             self.top_bar.gameui = self
-            cs = self.me().player_state
-            if cs == PlayerState.WAIT or cs == PlayerState.INIT:
-                # self.ui_game_status = GameUIStatus.WAIT_START
-                # self.messagebox_notify(game.get_server_message())
-                self.top_bar.set_connection_status(Colors.YELLOW)
-            else:
-                # self.ui_game_status = GameUIStatus.PLAY
-                self.top_bar.set_connection_status(Colors.GREEN)
             for n in self.me().notify_msg:
                 self.messagebox_notify(n.get_msg())
             self.refresh_inventory()
         except Exception as e:
             log("gui initialization failed with ", e)
             log("Couldn't connect")
-            sys.exit("Cant connect to host")
+            raise
+            # sys.exit("Cant connect to host")
 
     def me(self) -> Player:
         return self.game().players()[self.my_player_number]
@@ -583,7 +578,6 @@ class GameUI:
                                                         self.client_notify,
                                                         self.messagebox_notify)
                     self.set_game(_g_obj)
-                    log(f"SB: buy ret_val {self.me()}")
                 except Exception as e:
                     log("buy failed", e)
                 self.bottom_bar.hide_all()
@@ -622,6 +616,15 @@ class GameUI:
                     self.messagebox_notify("Cannot sell a blank word", Colors.RED)
                     self.ui_game_status = GameUIStatus.ENABLE_SELL
                     return
+
+                num_wild_cards = len(self.top_bar.word.split(WILD_CARD))
+                if num_wild_cards > 1:
+                    msg = f"You cannot have {num_wild_cards} wild cards" \
+                          f"{NL_DELIM}in a word, only 1 allowed."
+                    self.messagebox_notify(msg, Colors.RED)
+                    self.ui_game_status = GameUIStatus.ENABLE_SELL
+                    return
+
                 try:
                     (_, _g_obj) = ClientUtils.sell_word(self.game(), self.network,
                                                         self.my_player_number,
@@ -765,4 +768,5 @@ if __name__ == "__main__":
     mm = MainMenu(False, False)
     mm.controls[0].text = sys.argv[1]
     gui = GameUI(mm)
+    gui.handshake()
     gui.main()

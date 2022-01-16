@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from common.gameconstants import STD_HEADER_LENGTH
+from common.gameconstants import STD_HEADER_LENGTH, VERBOSE
 from common.logger import log
 
 
@@ -97,7 +97,8 @@ def receive_message(client_socket, block: bool = False):
                 if not block and msg_type is None:
                     return False
             except BrokenPipeError as bpe:
-                log(f"Unable to read std header in {calling_func_name(1)}:- {bpe.__str__()}")
+                if VERBOSE:
+                    log(f"Unable to read std header in {calling_func_name(1)}:- {bpe.__str__()}")
                 return False
         assert msg_type == ObjectType.MESSAGE
         return deserialize(msg_type, recvall(client_socket, message_length))

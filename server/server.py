@@ -183,6 +183,7 @@ class Server:
                 continuous_retries = MAX_RETRY
                 with game.game_mutex:
                     self.handle_client_msg(_cs, decodedP, game, payload)
+                    game.set_server_message(" ")
             except Exception as e:
                 log("unknown error in client handling thread", e)
                 # %%
@@ -281,10 +282,15 @@ class Server:
                 n = _q.__iter__().__next__()
                 if n.n_id <= msgs_notified_upto:
                     _popped_m = _cs.player.notify_msg.popleft()
-                    # log(f"SB: discarding notify msg {_popped_m}")
+                    if VERBOSE:
+                        log(f"discarding notify msg {_popped_m}")
                 else:
                     break
-            log(f"[GET] returning {_cs.player}")
+            game.set_server_message(f"{ClientResp.GET_RET.msg} {_cs.player}")
+            # if VERBOSE:
+            #     game.set_server_message(f"{ClientResp.GET_RET.msg} {_cs.player}")
+            # else:
+            #     log(f"{ClientResp.GET_RET.msg} {_cs.player}")
 
         elif ClientMsgReq.Buy == client_req:
             try:
@@ -343,7 +349,8 @@ class Server:
         """
         # self.games[_game_id] = current_game
         serverMessage = game.get_server_message()
-        log(f"serverMessage: {serverMessage} ")
+        if len(serverMessage.strip()) > 0:
+            log(f"serverMessage: {serverMessage} ")
         _cs.socket.sendall(serialize(ObjectType.OBJECT, game))
         _cs.set_last_active_ts()
         # game.set_server_message(" ")

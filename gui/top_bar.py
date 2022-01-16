@@ -3,7 +3,7 @@ Top bar displaying information about round
 """
 import pygame
 
-from common.game import Game, Player
+from common.game import Game, Player, PlayerState
 from common.logger import log
 from gui.display import Display
 from common.gameconstants import *
@@ -63,7 +63,7 @@ class TopBar(Display):
         self.client_msgs.draw(win)
         if self.gameui is not None:
             if not self.gameui.network.is_connected:
-                self.set_connection_status(Colors.RED)
+                self.__set_connection_status(Colors.RED)
                 # self.button = pygame.draw.rect(win, self.color, self.start_button_pos, 0)
         self.connection_button.draw(win)
         pygame.draw.circle(win, (0, 0, 0), (self.x + self.width - 50, self.y + round(self.height / 2)), 30,
@@ -124,15 +124,30 @@ class TopBar(Display):
             try:
                 self.gameui.network.reconnect()
                 player: Player = self.gameui.me()
-                self.gameui.game = self.gameui.network.send(ClientMsgReq.Get.msg +
-                                                            "notifications_received=" +
-                                                            str(len(player.notify_msg))
-                                                            )
-                self.set_connection_status(Colors.GREEN)
+                _g = self.gameui.network.send(ClientMsgReq.Get.msg +
+                                              "notifications_received=" +
+                                              str(len(player.notify_msg))
+                                              )
+                if _g is not None:
+                    self.gameui.set_game(_g)
+                elif self.gameui.network.is_connected:
+                    self.__set_connection_status(Colors.ORANGE)
+                else:
+                    self.__set_connection_status(Colors.RED)
             except Exception as e:
-                log("", e)
+                self.__set_connection_status(Colors.RED)
+                log("User initiated reconnect failed", e)
 
-    def set_connection_status(self, s: Colors, override: bool = False):
+    def set_connection_status(self, p: Player):
+        color = Colors.WHITE
+        if p.player_state == PlayerState.PLAY:
+            color = Colors.GREEN
+        elif p.player_state == PlayerState.WAIT or \
+                p.player_state == PlayerState.INIT:
+            color = Colors.YELLOW
+        self.__set_connection_status(color)
+
+    def __set_connection_status(self, s: Colors):
         self.connection_button.set_color(s)
         if s is Colors.YELLOW:
             self.connection_button.set_text("Wait")
@@ -141,7 +156,7 @@ class TopBar(Display):
             self.connection_button.set_text("Play")
             self.connection_button.set_blink(False)
         elif s is Colors.ORANGE:
-            self.connection_button.set_text("Wait Round")
+            self.connection_button.set_text("Connected")
             self.connection_button.set_blink(True)
         elif s is Colors.RED:
             self.connection_button.set_text("ReConnect")

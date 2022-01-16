@@ -23,7 +23,15 @@ configure_buygame()
   chown -R buygame:buygame /home/buygame
   cp buygame.service /etc/systemd/system/
   cp buygame.logrotate /etc/logrotate.d/buygame
+
   chown -R buygame:buygame /usr/local/src/buygame
+  mkdir /usr/local/src/buygame
+  chmod 755 /usr/local/src/buygame
+  cd /usr/local/src/buygame
+  git clone https://github.com/shakeebb/Buygame.git . 
+  python -m venv venv
+  source venv/bin/activate
+  venv/bin/pip install -r requirements.txt 
 }
 
 configure_server()

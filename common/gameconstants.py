@@ -53,9 +53,10 @@ SERVER_SETTINGS_TEMPLATE = {
 
 FPS = 30  # frames per second, the general speed of the program
 MAX_RETRY = 5
-
+NL_DELIM = '\\\\'
 # WINDOWWIDTH = 800 # size of window's width in pixels
 # WINDOWHEIGHT = 600 # size of windows' height in pixels
+
 
 class Colors(Enum):
     """
@@ -127,6 +128,7 @@ class ClientMsgReq(Enum):
 
 
 class ClientResp(Enum):
+    GET_RET = "get_return:"
     Racks_Ready = "racks ready:"
     Bought = "bought:"
     Buy_Cancelled = "buy_cancelled:"
