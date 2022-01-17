@@ -22,12 +22,13 @@ WILD_CARD = "*"
 MAX_LETTERS_ON_HOLD = 8
 
 CLIENT_DEFAULT_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/.default_settings.yaml')
-CLIENT_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/settings.yaml')
+CLIENT_SETTINGS_FILE = Path.home().absolute().joinpath('.buygame/client_settings.yaml')
 CLIENT_SETTINGS_TEMPLATE = {
     "version": "0.1",
-    "server_defaults": {
+    "target_server_defaults": {
         "ip": "23.239.14.203",
-        "port": "36909"
+        "port": "36909",
+        "socket_timeout": "20"
     }
     ,
     "user_defaults": {

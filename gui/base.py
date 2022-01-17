@@ -29,14 +29,15 @@ class GameUI:
     def __init__(self, main_menu: MainMenu):
         Display.init()
         self.main_menu = main_menu
-        self.server_settings = self.main_menu.game_settings['server_defaults']
+        self.target_server_settings = self.main_menu.game_settings['target_server_defaults']
         usr_defs = self.main_menu.game_settings['user_defaults']
 
         self.player_name = self.main_menu.controls[0].text
         input_ip = self.main_menu.controls[1].text
-        self.ip = input_ip if len(input_ip) > 0 else self.server_settings['ip']
+        self.ip = input_ip if len(input_ip) > 0 else self.target_server_settings['ip']
         input_port = self.main_menu.controls[2].text
-        self.port = int(input_port) if int(input_port) > 0 else int(self.server_settings['port'])
+        self.port = int(input_port) if int(input_port) > 0 else int(self.target_server_settings['port'])
+        self.socket_timeout = int(self.target_server_settings['socket_timeout'])
 
         if self.player_name not in dict(usr_defs):
             usr_defs[self.player_name] = {}
@@ -519,7 +520,10 @@ class GameUI:
 
     def handshake(self):
         try:
-            self.network = network.Network(self.ip, self.port, self.session_id, self.player_name)
+            self.network = network.Network(self.ip, self.port,
+                                           self.session_id,
+                                           self.player_name,
+                                           self.socket_timeout)
             game = self.network.connect()
             log("connected to network - session id: " + self.network.session_id)
 
@@ -534,7 +538,7 @@ class GameUI:
             user_defs['player_id'] = self.my_player_number
             user_defs['name'] = self.player_name
             user_defs['session_id'] = new_session_id
-            self.server_settings['ip'] = self.main_menu.controls[1].text
+            self.target_server_settings['ip'] = self.main_menu.controls[1].text
             self.main_menu.save_gamesettings()
 
             if game is None:

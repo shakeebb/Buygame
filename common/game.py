@@ -63,10 +63,11 @@ class Player:
         # Takes the bag as an argument, in order to create the rack.
         self.game = game
         self.number = num
+        self.client_ip_address = ""
         self.name = name
         self.p_conn_status = ConnectionStatus.INIT
         self.rack = Rack(nofw, bag)
-        self.money = self.game.game_settings['player_start_money']
+        self.money = int(self.game.game_settings['player_start_money'])
         self.team = team
         self.txn_status = Txn.INIT
         self.wordvalue = 0
@@ -272,6 +273,7 @@ class GameTrackerEntry:
         self.timestamp = ""
         self.session_id = ""
         self.player_name = ""
+        self.player_ip_address = ""
         self.player_state = PlayerState.INIT
         self.txn_status = Txn.INIT
         self.action = ""
@@ -304,6 +306,7 @@ class GameTrackerEntry:
     def update_player(self, p: Player, value: int = 0):
         self.session_id = p.session_id
         self.player_name = p.name
+        self.player_ip_address = str(p.client_ip_address)
         self.player_state = p.player_state
         self.txn_status = p.txn_status
         self.action = calling_func_name(3)
@@ -531,8 +534,8 @@ class Game:
                 o_m = f"{p.name} cannot have {num_wild_cards} wild cards" \
                       f"{NL_DELIM}in a word, only 1 allowed."
             else:
-                s_m = f"your word {word_str} doesn't exists"
-                o_m = f"{p.name}'s word {word_str} doesn't exists"
+                s_m = f"your word {word_str}{NL_DELIM}doesn't exists"
+                o_m = f"{p.name}'s word {word_str}{NL_DELIM}doesn't exists"
             s_notify_t = NotificationType.ERR
             # p.set_state(PlayerState.WAIT)
             p.set_state(PlayerState.PLAY)

@@ -84,11 +84,12 @@ class MainMenu:
                                        in_focus=True))
         self.controls.append(InputText(200, 400,
                                        "Connect to Server: ",
-                                       self.game_settings['server_defaults']['ip']))
+                                       self.game_settings['target_server_defaults']['ip'],
+                                       max_length=16))
 
         self.controls.append(InputText(200, 500,
                                        "Connect to Server Port: ",
-                                       self.game_settings['server_defaults']['port']))
+                                       self.game_settings['target_server_defaults']['port']))
 
     def draw(self):
         self.surface.fill(self.BG)
@@ -142,7 +143,7 @@ class MainMenu:
                         if e.errno == 61:
                             msg = f"- Server unavailable. Check [{g.ip}:{g.port}] is correct"
                         else:
-                            msg = f"{e}"
+                            msg = f"- {e}"
                         self.messagebox = MessageBox(self.surface.get_width(), self.surface.get_height(),
                                                      20, 5,
                                                      msg,
@@ -162,6 +163,8 @@ class MainMenu:
                         if self.messagebox.button_events(*mouse):
                             self.messagebox = None
                             self.wc_state = WelcomeState.QUIT
+                            run = False
+                            pygame.quit()
                         continue  # modal dialog box.
 
                     if self.user_choices is not None:
@@ -171,7 +174,6 @@ class MainMenu:
                         (event.type == KEYUP and event.key == K_ESCAPE):
                     run = False
                     pygame.quit()
-                    quit()
                 if event.type == VIDEORESIZE:
                     # screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                     Display.resize(event, g.refresh_resolution) if g is not None else None

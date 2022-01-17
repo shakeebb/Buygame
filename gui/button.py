@@ -246,7 +246,7 @@ class RadioButton(Button):
 
 
 class MessageBox(pygame.sprite.Sprite):
-    MAX_LINE_LENGTH = 50
+    MAX_LINE_LENGTH = 70
 
     def __init__(self, parent_width: int, parent_height: int, width: int, height: int,
                  msg: str,
@@ -263,11 +263,13 @@ class MessageBox(pygame.sprite.Sprite):
         for m in self.orig_msg.split(NL_DELIM):
             if len(m) <= 0:
                 continue
-            if len(oneliner) > MessageBox.MAX_LINE_LENGTH:
-                _msgs.append(self.font.render(oneliner, True, self.f_color.value))
-                oneliner = m
-                continue
             oneliner += ' ' + m
+            while len(oneliner) > MessageBox.MAX_LINE_LENGTH:
+                line = oneliner[:MessageBox.MAX_LINE_LENGTH]
+                _msgs.append(self.font.render(line,
+                                              True, self.f_color.value))
+                oneliner = oneliner[MessageBox.MAX_LINE_LENGTH:]
+                continue
         # add the residual last line
         _msgs.append(self.font.render(oneliner, True, self.f_color.value))
 
@@ -324,10 +326,12 @@ class MessageBox(pygame.sprite.Sprite):
 class InputText:
     def __init__(self, x: int, y: int, prompt,
                  default: str,
-                 in_focus: bool = False):
+                 in_focus: bool = False,
+                 max_length = MAX_NAME_LENGTH):
         self.prompt = prompt
         self.text = default
         self.in_focus = in_focus
+        self.max_length = max_length
         self.x = x
         self.y = y
 
@@ -348,8 +352,8 @@ class InputText:
         elif len(char) == 1:
             self.text += char
 
-        if len(self.text) >= MAX_NAME_LENGTH:
-            self.text = self.text[:MAX_NAME_LENGTH]
+        if len(self.text) >= self.max_length:
+            self.text = self.text[:self.max_length]
 
     def begin_input(self):
         self.in_focus = True

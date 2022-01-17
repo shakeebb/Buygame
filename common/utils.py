@@ -104,7 +104,7 @@ def receive_message(client_socket, block: bool = False):
         return deserialize(msg_type, recvall(client_socket, message_length))
     except Exception as e:
         log("receive message failed with: ", e)
-        return False
+        raise
 
 
 def recvall(sock, size):

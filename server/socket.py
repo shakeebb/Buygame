@@ -5,8 +5,9 @@ from common.game import Player
 
 
 class ClientSocket:
-    def __init__(self, c_soc: socket):
+    def __init__(self, c_soc: socket, client_address):
         self.socket = c_soc
+        self.c_addr = client_address
         self.last_hb_received = datetime.now()
         self.is_active = True
         self.player = None

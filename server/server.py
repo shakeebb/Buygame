@@ -119,7 +119,7 @@ class Server:
                     client_socket.setblocking(True)
                     # adding client socket to list of users
                     log(f"[CONNECTION] {client_address} connected!")
-                    cs = ClientSocket(client_socket)
+                    cs = ClientSocket(client_socket, client_address)
                     g, player = self.handshake(cs)
                     if g is None:
                         cs.close(self.threads_list)
@@ -448,6 +448,7 @@ class Server:
                 return str(f"[g={game_id}]-[t={team_id}]-[p={player_id}]-"
                            f"[{player_name}]-[{begin_time}]")
 
+            player.client_ip_address = cs.c_addr[0]
             g.set_server_message(f"{player.name} handshake complete")
             player.session_id = create_session_id()
             return g, player

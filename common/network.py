@@ -8,6 +8,7 @@ Created on Fri Mar 26 12:19:27 2021
 import pickle
 import socket
 import time
+from sys import platform
 from threading import Thread, Event, RLock
 
 from common.game import Game
@@ -36,9 +37,10 @@ from common.utils import receive_message, receive_pickle, serialize, ObjectType
 
 
 class Network:
-    def __init__(self, ip, port, session_id, player_name):
+    def __init__(self, ip, port, session_id, player_name, socket_timeout):
         log(f"creating {player_name} client socket to {ip}:{port} with {session_id}")
         self.retries = MAX_RETRY
+        self.socket_timeout = socket_timeout
         self.client: socket = self.create_client_socket()
         self.is_connected = False
         self.server = ip
@@ -60,6 +62,8 @@ class Network:
             soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             soc.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            if platform != "win32":
+                soc.settimeout(self.socket_timeout)
             return soc
         except socket.error as se:
             log("client socket creation failed", se)
@@ -173,7 +177,7 @@ class Network:
                         sleepTime *= 2
                         continue
                     else:
-                        raise e
+                        raise
 
     # def sendP(self, data):
     #     while True:

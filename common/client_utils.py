@@ -97,7 +97,7 @@ class ClientUtils:
             # messagebox_notify(f"Bought. You have ${player.money} ", Colors.GREEN)
             return GameUIStatus.BOUGHT, game
         else:
-            messagebox_notify(f"Buy failed. You have ${player.money} ", Colors.RED)
+            notify_cln_msg(f"- Buy failed. You have ${player.money} ", Colors.RED)
             return GameUIStatus.BUY_FAILED, game
 
     @staticmethod
