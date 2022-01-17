@@ -269,6 +269,7 @@ class GameState(Enum):
 class GameTrackerEntry:
     def __init__(self):
         self.game_id = ""
+        self.round = -1
         self.game_state = GameState.INIT
         self.timestamp = ""
         self.session_id = ""
@@ -301,6 +302,7 @@ class GameTrackerEntry:
 
     def update_game(self, g):
         self.game_id = g.game_id
+        self.round = g.round
         self.game_state = g.game_state
 
     def update_player(self, p: Player, value: int = 0):
@@ -434,7 +436,7 @@ class Game:
         n = len(self.players())
         if self.bag.get_remaining_tiles() < (
                 dice_value * n):
-            err_msg = f"cannot draw {dice_value} out of {self.bag.get_remaining_tiles()} letters."
+            err_msg = f"cannot draw {dice_value}*{n} out of {self.bag.get_remaining_tiles()} letters."
             log(f"insufficient {dice_value} letters for {n} players in bag."
                 f"{NL_DELIM}remaining={self.bag.get_remaining_tiles()}")
             self.foreach_player(lambda _p: _p.set_notify(NotificationType.ERR, err_msg))
