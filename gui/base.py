@@ -81,16 +81,18 @@ class GameUI:
             #       f"{c}, tf(({c} / {parts}) * {part_of_parts})={mid_horiz}")
             return mid_horiz
 
-        self.temp_rack = Inventory(self.leaderboard.xmargin() + equalparts_point(85, 8, 2),
-                                   self.top_bar.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
-                                   width_cells=-1,
-                                   height_cells=2 * TILE_ADJ_MULTIPLIER,
-                                   size=(2 * TILE_ADJ_MULTIPLIER),
-                                   rows=1, cols=5, display_dollar_value=True,
-                                   border_color=Colors.LT_GRAY, box_color=Colors.WHITE)
+        self.buy_rack = Inventory(InventoryType.BUY_RACK, self,
+                                  self.leaderboard.xmargin() + equalparts_point(85, 8, 2),
+                                  self.top_bar.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
+                                  width_cells=-1,
+                                  height_cells=2 * TILE_ADJ_MULTIPLIER,
+                                  size=(2 * TILE_ADJ_MULTIPLIER),
+                                  rows=1, cols=5, display_dollar_value=True,
+                                  border_color=Colors.LT_GRAY, box_color=Colors.WHITE)
 
-        self.inventory = Inventory(self.leaderboard.xmargin() + equalparts_point(85, 12, 1),
-                                   self.temp_rack.ymargin() + 2,
+        self.word_rack = Inventory(InventoryType.WORD_RACK, self,
+                                   self.leaderboard.xmargin() + equalparts_point(85, 12, 1),
+                                   self.buy_rack.ymargin() + 2,
                                    width_cells=-1,
                                    height_cells=2 * TILE_ADJ_MULTIPLIER,
                                    size=2 * TILE_ADJ_MULTIPLIER,
@@ -111,16 +113,18 @@ class GameUI:
                          - (1 * TILE_ADJ_MULTIPLIER),
                          self)
 
-        self.myrack = Inventory(self.bottom_bar.h_margin_cells + 5,
-                                self.bottom_bar.v_margin_cells + 1,
-                                self.bottom_bar.v_margin_cells - 6,
-                                2, 2 * TILE_ADJ_MULTIPLIER, 1, 13, border_color=Colors.GRAY)
+        self.tile_rack = Inventory(InventoryType.TILE_RACK, self,
+                                   self.bottom_bar.h_margin_cells + 5,
+                                   self.bottom_bar.v_margin_cells + 1,
+                                   self.bottom_bar.v_margin_cells - 6,
+                                   2, 2 * TILE_ADJ_MULTIPLIER, 1, 13, border_color=Colors.GRAY)
 
-        self.extrarack = Inventory(self.bottom_bar.h_margin_cells + 15,
-                                   self.bottom_bar.v_margin_cells + (4 * TILE_ADJ_MULTIPLIER),
-                                   self.bottom_bar.v_margin_cells - (10 * TILE_ADJ_MULTIPLIER),
-                                   (2 * TILE_ADJ_MULTIPLIER), (2 * TILE_ADJ_MULTIPLIER),
-                                   1, 5, border_color=Colors.GRAY)
+        self.wc_rack = Inventory(InventoryType.WILD_CARD_RACK, self,
+                                 self.bottom_bar.h_margin_cells + 15,
+                                 self.bottom_bar.v_margin_cells + (4 * TILE_ADJ_MULTIPLIER),
+                                 self.bottom_bar.v_margin_cells - (10 * TILE_ADJ_MULTIPLIER),
+                                 (2 * TILE_ADJ_MULTIPLIER), (2 * TILE_ADJ_MULTIPLIER),
+                                 1, 5, border_color=Colors.GRAY)
 
         self.top_bar.change_round(1)
         self.tileList = pygame.sprite.Group()
@@ -162,15 +166,15 @@ class GameUI:
         self.bottom_bar.draw(self.surface)
         self.chat.draw(self.surface)
 
-        self.temp_rack.draw(self.surface)
-        self.inventory.draw(self.surface)
-        self.myrack.draw(self.surface)
-        self.extrarack.draw(self.surface)
+        self.buy_rack.draw(self.surface)
+        self.word_rack.draw(self.surface)
+        self.tile_rack.draw(self.surface)
+        self.wc_rack.draw(self.surface)
 
         def tile_grp(_inv: Inventory):
             _inv.tile_group.draw(self.surface)
 
-        for __i in [self.inventory, self.myrack, self.extrarack, self.temp_rack]:
+        for __i in [self.word_rack, self.tile_rack, self.wc_rack, self.buy_rack]:
             tile_grp(__i)
         # self.tileList.draw(self.surface)
         if len(self.alert_boxes) > 0:
@@ -182,12 +186,12 @@ class GameUI:
     def refresh_resolution(self, w, h):
         self.top_bar.refresh_dims()
         self.leaderboard.refresh_dims()
-        self.inventory.refresh_dims()
+        self.word_rack.refresh_dims()
         self.chat.refresh_dims()
         # self.bag.refresh_dims()
         self.bottom_bar.refresh_dims()
-        self.myrack.refresh_dims()
-        self.extrarack.refresh_dims()
+        self.tile_rack.refresh_dims()
+        self.wc_rack.refresh_dims()
         pass
 
     def check_clicks(self):
@@ -199,11 +203,14 @@ class GameUI:
 
         # print(pos)
 
-        def check_tiles(tiles):
+        def check_tiles(inv):
             # move tiles
-            for tile in tiles:
+            for tile in inv.tile_group:
+                import gui
+                assert isinstance(tile, gui.base.Tile)
                 if tile.rect.collidepoint(*pos):
-                    tile.clicked = True
+                    tile.m_button_down()
+                    inv.tile_group.change_layer(tile, MOVING_TILE_LAYER)
                     return tile
             return None
 
@@ -212,17 +219,17 @@ class GameUI:
         #     log(f"tilelist: mouse down on {ret_val}")
         #     return ret_val
 
-        ret_val = check_tiles(self.inventory.tile_group)
+        ret_val = check_tiles(self.word_rack)
         if ret_val is not None:
             # log(f"inventory: mouse down on {ret_val}")
             return ret_val
 
-        ret_val = check_tiles(self.myrack.tile_group)
+        ret_val = check_tiles(self.tile_rack)
         if ret_val is not None:
             # log(f"myrack: mouse down on {ret_val}")
             return ret_val
 
-        ret_val = check_tiles(self.extrarack.tile_group)
+        ret_val = check_tiles(self.wc_rack)
         if ret_val is not None:
             # log(f"extrarack: mouse down on {ret_val}")
             return ret_val
@@ -279,7 +286,7 @@ class GameUI:
         # self.handshake()
 
         pygame.event.clear()
-        selected = None
+        selected: gui.base.Tile = None
         self.hb_thread.start()
 
         while True:  # main game loop
@@ -309,6 +316,8 @@ class GameUI:
                     if selected is None:
                         self.top_bar.button_events()
                         self.bottom_bar.button_events()
+                    else:
+                        log(f"Tile selected {selected}")
                     # if event.button == 1:
                     #     boxpos = self.inventory.Get_pos()
                     #     if self.inventory.In_grid(boxpos[0], boxpos[1]):
@@ -325,23 +334,62 @@ class GameUI:
 
                 if event.type == pygame.MOUSEBUTTONUP:
                     def button_up(_inv: Inventory):
+                        success = False
                         try:
-                            _boxpos = _inv.Get_pos()
-                            if selected and _inv.In_grid(_boxpos[0], _boxpos[1]):
-                                self.inventory.remove_tile(selected)
-                                self.myrack.remove_tile(selected)
-                                self.extrarack.remove_tile(selected)
-                                _inv.Add(selected, _boxpos)
-                                return True
+                            slots = pygame.sprite.spritecollide(selected,
+                                                                _inv.slots_group,
+                                                                dokill=False)
+                            if len(slots) > 0:
+                                # log(f"SB: Found \"{_inv}\" collided slot {slots}")
+                                for s in slots:
+                                    assert isinstance(s, Inventory.Slot)
+                                    if s.is_empty():
+                                        # log(f"SB: slot {s} is empty")
+                                        s.add_or_move_tile(selected)
+                                        assert s.is_filled()
+                                        # log(f"slot status after adding {s}")
+                                        success = True
+                                        break
+                            # _boxpos = _inv.get_pos()
+                            # if selected and _inv.in_grid(_boxpos[0], _boxpos[1]):
+                            #     res = _inv.add_tile(selected, _boxpos)
+                            #     if res:
+                            #         self.inventory.remove_tile(selected)
+                            #         self.myrack.remove_tile(selected)
+                            #         self.extrarack.remove_tile(selected)
+                            #     return True
                         finally:
-                            for tile in _inv.tile_group:
-                                tile.clicked = False
-                            self.top_bar.word = self.inventory.get_word()
+                            # for tile in _inv.tile_group:
+                            #     tile.clicked = False
+                            self.top_bar.word = self.word_rack.get_word()
+                        return success
 
-                    for __i in [self.inventory, self.myrack, self.extrarack]:
-                        if button_up(__i):
-                            break
-                    selected = None
+                    if selected is not None:
+                        move_to_inv = selected.get_target_inventory(self)
+                        if selected.m_button_up(pygame.mouse.get_pos()):
+                            empty_slots = [s for s in move_to_inv.slots_group if s.is_empty()]
+                            if len(empty_slots) > 0:
+                                empty_slots[0].add_or_move_tile(selected)
+                                assert empty_slots[0].is_filled()
+                                self.top_bar.word = self.word_rack.get_word()
+                                selected = None
+                        else:
+                            for __i in [selected.base_slot.inv, move_to_inv]:
+                                if button_up(__i):
+                                    selected = None
+                                    break
+
+                    # if selected tile not placed in any of the inventories.
+                    if selected is not None:
+                        selected.return_to_base()
+                        selected = None
+
+                    # for __i in [self.word_rack, self.tile_rack, self.wc_rack]:
+                    #     g = __i.tile_group
+                    #     assert isinstance(g, pygame.sprite.LayeredUpdates)
+                    #     # log(f"SB: this {__i} layers {g.layers()}")
+                    #     for lno in g.layers():
+                    #         assert lno != MOVING_TILE_LAYER
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
@@ -374,9 +422,9 @@ class GameUI:
 
             if update_tile_pos(self.tileList):
                 pass
-            elif update_tile_pos(self.inventory.tile_group):
+            elif update_tile_pos(self.word_rack.tile_group):
                 pass
-            elif update_tile_pos(self.myrack.tile_group):
+            elif update_tile_pos(self.tile_rack.tile_group):
                 pass
 
             # box.blit()
@@ -387,12 +435,12 @@ class GameUI:
         try:
             self.leaderboard.players = self.game().players()
             player = self.me()
-            self.myrack.clear()
-            self.temp_rack.clear()
-            self.extrarack.clear()
+            self.tile_rack.clear()
+            self.buy_rack.clear()
+            self.wc_rack.clear()
             if clear_inventory:
-                self.inventory.clear()
-                self.top_bar.word = self.inventory.get_word()
+                self.word_rack.clear()
+                self.top_bar.word = self.word_rack.get_word()
 
             def process_rack(rack: [common.game.Tile], temp=False):
                 for rT in rack:
@@ -400,17 +448,17 @@ class GameUI:
                         self.client_notify("Received empty letters in the rack")
                         continue
                     # skip the inventory letters moved by the user
-                    if self.inventory.contains_letter(rT.letter):
+                    if self.word_rack.contains_letter(rT):
                         continue
 
-                    inv = self.temp_rack if temp else self.myrack
+                    inv = self.buy_rack if temp else self.tile_rack
                     import gui
                     _tile = gui.base.Tile(inv.x, inv.y, rT.get_tile_id(), self.sprite_tiles, rT.get_letter(),
                                           inv.box_size, rT.score)
                     if rT.letter == WILD_CARD:
-                        self.extrarack.Add(_tile)
+                        self.wc_rack.add_tile(_tile)
                     else:
-                        inv.Add(_tile)
+                        inv.add_tile(_tile)
 
             # %% end of process_rack
 
@@ -435,6 +483,7 @@ class GameUI:
             if n.n_id <= self.last_notification_received:
                 continue
             alert_box = False
+            flash = False
             color = Colors.BLACK
             if n.n_type == NotificationType.ERR:
                 color = Colors.RED
@@ -448,19 +497,31 @@ class GameUI:
                 color = Colors.GREEN
             elif n.n_type == NotificationType.ACT_2:
                 color = Colors.DIRTY_YELLOW
+            elif n.n_type == NotificationType.FLASH:
+                color = Colors.GREEN
+                alert_box = True
+                flash = True
             # log(f"SB: adding notify {n.get_msg()}")
-            self.messagebox_notify(n.get_msg(), color, is_an_alert=alert_box)
+            self.messagebox_notify(n.get_msg(), color,
+                                   is_an_alert=alert_box,
+                                   do_flash=flash)
             last_notification = n
 
         if last_notification is not None:
             self.last_notification_received = last_notification.n_id
 
-    def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK, is_an_alert=False):
+    def messagebox_notify(self, msg: str, color: Colors = Colors.BLACK,
+                          is_an_alert=False, do_flash=False):
         for m in msg.split(NL_DELIM):
             if m[0] == '-':
                 self.message_box.add_msg(m, color)
             else:
                 self.message_box.add_msg('  ' + m, color)
+
+        def handle_ok():
+            if self.game().game_state == GameState.TERMINATE:
+                self.quit()
+            self.alert_boxes.pop(0)
 
         if color == Colors.RED or is_an_alert:
             self.alert_boxes.append(MessageBox(self.surface.get_width(),
@@ -469,7 +530,8 @@ class GameUI:
                                                msg,
                                                "ok",
                                                in_display=True,
-                                               on_ok=lambda: self.alert_boxes.pop(0)))
+                                               on_ok=handle_ok,
+                                               blink=do_flash))
 
     def check_round_complete(self):
         (self.ui_game_status, r, _g_obj) = ClientUtils.round_done(self.top_bar.round, self.network,
@@ -494,8 +556,8 @@ class GameUI:
     def mark_round_complete(self):
         if self.current_round != -1:
             self.top_bar.client_msgs.add_msg(f"UI: moving from round {self.current_round} to {self.__game.round}")
+            self.ui_game_status = GameUIStatus.PLAY
         self.current_round = self.__game.round
-        self.ui_game_status = GameUIStatus.PLAY
         self.top_bar.round = self.current_round
         self.bottom_bar.hide_all()
         self.refresh_inventory(True)
@@ -504,14 +566,14 @@ class GameUI:
         return self.__game
 
     def set_iplayed(self, txn_state: Txn):
-        if txn_state == Txn.SOLD_SELL_AGAIN \
-                or txn_state == Txn.SELL_CANCELLED_SELL_AGAIN\
+        if txn_state == Txn.MUST_SELL \
+                or txn_state == Txn.SELL_CANCELLED_SELL_AGAIN \
                 or txn_state == Txn.NO_SELL:
-            self.bottom_bar.enable_sell()
+            self.bottom_bar.show_sell(False)
             remaining = self.me().get_remaining_letters()
             self.messagebox_notify(f"Sell atleast {remaining} letter(s).", Colors.RED)
             self.refresh_inventory(True)
-            self.ui_game_status = GameUIStatus.ENABLE_SELL
+            self.ui_game_status = GameUIStatus.SHOW_SELL
         else:
             log(f"Marking end of round {self.game().round}")
             self.ui_game_status = GameUIStatus.PLAY
@@ -576,7 +638,8 @@ class GameUI:
         game_state = self.game().game_state
         txn_state = self.me().txn_status
         if game_state == GameState.ROLL:
-            if self.ui_game_status.value < GameUIStatus.ROLL_DICE.value:
+            if self.ui_game_status.value < GameUIStatus.ROLL_DICE.value or \
+                    self.ui_game_status == GameUIStatus.END_TURN:
                 self.ui_game_status = GameUIStatus.ROLL_DICE
                 self.bottom_bar.enable_dice_rolling()
                 return
@@ -611,10 +674,10 @@ class GameUI:
                 self.refresh_inventory()
                 return
 
-            elif self.ui_game_status == GameUIStatus.CANCEL_BUY:
-                (_, _g_obj) = ClientUtils.cancel_buy(self.game(), self.network,
-                                                     self.server_notify,
-                                                     self.client_notify)
+            elif self.ui_game_status == GameUIStatus.SKIP_BUY:
+                (_, _g_obj) = ClientUtils.skip_buy(self.game(), self.network,
+                                                   self.server_notify,
+                                                   self.client_notify)
                 self.set_game(_g_obj)
                 self.bottom_bar.hide_all()
                 self.refresh_inventory()
@@ -626,7 +689,7 @@ class GameUI:
                 self.ui_game_status = GameUIStatus.BUY_ENABLED
                 return
             elif txn_state == Txn.ROLLED:
-                self.bottom_bar.enable_buy()
+                self.bottom_bar.show_buy()
                 self.refresh_inventory()
                 self.ui_game_status = GameUIStatus.BUY_ENABLED
                 return
@@ -634,39 +697,55 @@ class GameUI:
             # %% end of server side BUY handling
             return
 
-        elif game_state == GameState.SELL:
+        elif game_state == GameState.SELL or game_state == GameState.END_SELL_ONLY:
+            if txn_state == Txn.TURN_COMPLETE:
+                self.bottom_bar.hide_all()
+                return
+
             if self.ui_game_status == GameUIStatus.SELL_ENABLED:
                 return
 
             if self.ui_game_status == GameUIStatus.SELL:
                 if len(self.top_bar.word) == 0:
                     self.messagebox_notify("- Cannot sell a blank word", Colors.RED)
-                    self.ui_game_status = GameUIStatus.ENABLE_SELL
+                    self.ui_game_status = GameUIStatus.SHOW_SELL
                     return
 
                 num_wild_cards = len(self.top_bar.word.split(WILD_CARD))
                 if num_wild_cards > 2:
-                    msg = f"- You cannot have {num_wild_cards} wild cards" \
+                    msg = f"- You cannot have {num_wild_cards-1} wild cards" \
                           f"{NL_DELIM}in a word, only 1 allowed."
                     self.messagebox_notify(msg, Colors.RED)
-                    self.ui_game_status = GameUIStatus.ENABLE_SELL
+                    self.ui_game_status = GameUIStatus.SHOW_SELL
                     return
 
                 try:
-                    (_, _g_obj) = ClientUtils.sell_word(self.game(), self.network,
-                                                        self.my_player_number,
-                                                        self.top_bar.word,
-                                                        self.server_notify,
-                                                        self.client_notify,
-                                                        self.messagebox_notify)
+                    (self.ui_game_status, _g_obj) = \
+                          ClientUtils.sell_word(self.game(), self.network,
+                                                self.my_player_number,
+                                                self.top_bar.word,
+                                                self.server_notify,
+                                                self.client_notify,
+                                                self.messagebox_notify)
                     self.set_game(_g_obj)
                 except Exception as e:
                     log("sell word failed", e)
-                self.set_iplayed(self.me().player_state)
                 return
 
-            elif self.ui_game_status == GameUIStatus.CANCEL_SELL:
-                (g_status, _g_obj) = ClientUtils.cancel_sell(self.network, self.server_notify, self.client_notify)
+            elif self.ui_game_status == GameUIStatus.DISCARD_SELL:
+                (g_status, _g_obj) = ClientUtils.discard_sell(self.network,
+                                                              self.top_bar.word,
+                                                              self.server_notify,
+                                                              self.client_notify)
+                if g_status is not None:
+                    self.ui_game_status = g_status
+                    self.set_game(_g_obj)
+                return
+
+            elif self.ui_game_status == GameUIStatus.END_TURN:
+                (g_status, _g_obj) = ClientUtils.end_turn(self.network,
+                                                          self.server_notify,
+                                                          self.client_notify)
                 if g_status is not None:
                     self.ui_game_status = g_status
                     self.set_game(_g_obj)
@@ -675,14 +754,35 @@ class GameUI:
                 self.set_iplayed(self.me().player_state)
                 return
 
-        if self.ui_game_status.value < GameUIStatus.SELL_ENABLED.value:
-            self.bottom_bar.enable_sell()
-            self.refresh_inventory(True)
-            self.ui_game_status = GameUIStatus.SELL_ENABLED
+            # UI is initialising. other cases are handled in respective game_state.
+            elif self.ui_game_status.value <= GameUIStatus.SHOW_SELL.value:
+                self.bottom_bar.show_sell(False)
+                self.refresh_inventory(True)
+                self.ui_game_status = GameUIStatus.SELL_DISPLAYED
+            # enable_sell when atleast 1 tile is in the word_rack
+            elif self.ui_game_status == GameUIStatus.ENABLE_SELL:
+                self.bottom_bar.enable_action()
+                self.ui_game_status = GameUIStatus.SELL_ENABLED
+                return
+        # %% end of server side SELL handling
+
+        elif game_state == GameState.TERMINATE:
+            assert txn_state == Txn.TURN_COMPLETE, f"${txn_state} not expected"
+            self.bottom_bar.hide_all()
+            self.ui_game_status = GameUIStatus.TERMINATE
             return
 
-        return
-        # %% end of server side SELL handling
+    def notify_inv_value(self, inv: Inventory, total: int):
+        g_s = self.ui_game_status.value
+        # only under the scope of SELL, we should toggle
+        if GameUIStatus.SHOW_SELL.value <= g_s < GameUIStatus.DISCARD_SELL.value and \
+                inv.inv_type == InventoryType.WORD_RACK:
+            if total > 0:
+                self.bottom_bar.enable_action()
+                self.ui_game_status = GameUIStatus.ENABLE_SELL
+            elif total <= 0:
+                self.bottom_bar.disable_action()
+                self.ui_game_status = GameUIStatus.SHOW_SELL
 
 
 class SpriteSheet:
@@ -711,6 +811,7 @@ class Tile(pygame.sprite.Sprite):
     def __init__(self, xpos, ypos, id, tile_sprites: list[list[Surface]], letter='C',
                  box_size: int = 50,
                  score=None):
+        self._layer = TILE_LAYER
         super(Tile, self).__init__()
         self.id = id
         self.all_tiles = tile_sprites
@@ -729,16 +830,35 @@ class Tile(pygame.sprite.Sprite):
         self.size = self.image.get_size()
         self.box_size = box_size
         self.clicked = False
+        self.mouse_down_pos: pygame.Rect = None
         self.rect = self.image.get_rect()
         self.update_rect(xpos, ypos)
         self.score = score
         self.letter: str = letter
         self.inabox = False
         self.init = True
-        self._layer = 4
+        self.base_slot: Inventory.Slot = None
 
     def __str__(self):
-        return type(self).__name__ + " " + self.letter
+        return str(self.base_slot) if self.base_slot is not None else self.letter
+
+    def draw(self, win: Surface):
+        win.blit(self.image, self.rect)
+        # pygame.draw.rect(win)
+
+    def update_slot(self, slot):
+        if self.base_slot is not None:
+            self.base_slot.inv.remove_tile(self)
+        self.base_slot = slot
+        self.rect.topleft = (self.base_slot.x, self.base_slot.y)
+        self.clicked = False
+
+    def return_to_base(self):
+        self.rect.x, self.rect.y = (self.base_slot.x, self.base_slot.y)
+        self.clicked = False
+        tg = self.base_slot.inv.tile_group
+        if tg.has(self):
+            tg.change_layer(self, TILE_LAYER)
 
     def inBox(self, inventory):
         border = 3
@@ -748,7 +868,7 @@ class Tile(pygame.sprite.Sprite):
         x = x // (self.box_size + border)
         y = y // (self.box_size + border)
         # print(f"Tile Position is {x} and {y}")
-        self.inabox = inventory.In_grid(x, y)
+        self.inabox = inventory.in_grid(x, y)
         return self.inabox
 
     def update_rect(self, xpos, ypos):
@@ -759,6 +879,31 @@ class Tile(pygame.sprite.Sprite):
         __r = self.original.get_rect()
         __r.x = self.rect.x
         __r.y = self.rect.y
+
+    def m_button_down(self):
+        self.clicked = True
+        self.mouse_down_pos = pygame.rect.Rect(*pygame.mouse.get_pos(), 10, 10)
+
+    def get_target_inventory(self, game: GameUI):
+        current_inv_t = self.base_slot.inv.inv_type
+        if current_inv_t == InventoryType.WORD_RACK:
+            if self.letter == WILD_CARD:
+                return game.wc_rack
+            else:
+                return game.tile_rack
+        elif current_inv_t == InventoryType.TILE_RACK:
+            return game.word_rack
+        elif current_inv_t == InventoryType.WILD_CARD_RACK:
+            return game.word_rack
+        else:
+            return self.base_slot.inv
+
+    def m_button_up(self, new_mouse_pos):
+        if self.mouse_down_pos.collidepoint(*new_mouse_pos):
+            self.clicked = False
+            self.mouse_down_pos = None
+            return True
+        return False
 
 
 class Bag(Display):
@@ -784,16 +929,16 @@ class Bag(Display):
         self.rect = self.image.get_rect()
         self.rect.x = self.x
         self.rect.y = self.y
-        if VERBOSE:
-            print("Box %s " % self.box_size)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 0:
+    if len(sys.argv) <= 1:
         log("Provide user name as the first argument")
         sys.exit(1)
     mm = MainMenu(False, False)
     mm.controls[0].text = sys.argv[1]
+    if len(sys.argv) > 2:
+        mm.controls[1].text = sys.argv[2]
     gui = GameUI(mm)
     gui.handshake()
     gui.main()

@@ -4,13 +4,15 @@ import pygame
 
 from common.logger import log
 from gui.display import Display
-from common.gameconstants import VERBOSE, Colors
+from common.gameconstants import VERBOSE, Colors, SLOT_LAYER, INVENTORY_LAYER, TILE_LAYER, MOVING_TILE_LAYER, \
+    InventoryType
 
 
 class Inventory(Display):
 
     class Slot(pygame.sprite.Sprite):
-        def __init__(self, x, y, width, height, fill_color=Colors.LTR_GRAY):
+        def __init__(self, inv, x, y, width, height, fill_color=Colors.LTR_GRAY):
+            self._layer = SLOT_LAYER
             super(Inventory.Slot, self).__init__()
             self.x = x
             self.y = y
@@ -18,15 +20,73 @@ class Inventory(Display):
             self.height = height
             self.fill_color = fill_color
             self.rect_dims = (self.x, self.y, self.width, self.height)
-            self._layer = 3
+            from gui.base import Tile
+            self.slot_tile: Tile = None
+            self.rect = pygame.rect.Rect(*self.rect_dims)
+            self.inv: Inventory = inv
+
+        def __str__(self):
+            return self.__repr__()
+
+        def __repr__(self):
+            return f"\"{self.inv}\" letter {self.slot_tile.letter}" if self.is_filled() \
+                else "<empty>"
 
         def draw(self, win):
             pygame.draw.rect(win, self.fill_color.value, self.rect_dims)
+            if self.is_filled():
+                if self.slot_tile.clicked:
+                    r = self.slot_tile.rect
+                    mx, my = pygame.mouse.get_pos()
+                    (r.x, r.y) = (mx - r.width/2.4, my - r.height/2.4)
+                    # self.slot_tile.init = False
+                # elif self.slot_tile.init:
+                #     self.slot_tile.update_rect(self.x, self.y)
+                #     # __t.update_rect(self.x + ((self.box_size + self.border) * (y + 0.5)),
+                #     #                 self.rect[1] + INIT_TILE_SIZE + self.border + 5)
+                # elif self.slot_tile.inBox(self):
+                #     # self.items[x][y].rect.topleft = (self.x + (x * (self.box_size + self.border)), self.y)
+                #     self.slot_tile.rect.topleft = (self.x, self.y)
 
-    def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells, size, rows, cols,
+                # self.slot_tile.draw(win)
+
+        def add_or_move_tile(self, tile):
+            from gui.base import Tile
+            assert isinstance(tile, Tile)
+            assert self.is_empty()
+
+            # update the tile slot first, so that if
+            # self.inv == tile.base_slot.inv, then add/remove is
+            # just b/w slots. Also, tile.update_slot removes
+            # from the same inv, so let it drop the tile from
+            # the slot first.
+            tile.update_slot(self)
+
+            self.slot_tile = tile
+            self.inv.tile_group.add(tile, layer=TILE_LAYER)
+            self.inv.tile_group.change_layer(tile, TILE_LAYER)
+            self.inv.refresh_dollar_value()
+            return True
+
+        def remove_tile(self):
+            self.slot_tile = None
+
+        def is_filled(self):
+            return self.slot_tile is not None
+
+        def is_empty(self):
+            return self.slot_tile is None
+
+    def __init__(self, inv_type: InventoryType, gameui,
+                 h_margin_cells, v_margin_cells, width_cells, height_cells,
+                 size, rows, cols,
                  display_dollar_value: bool = False,
                  border_color=Colors.BLACK, box_color=Colors.LTR_GRAY):
+        self._layer = INVENTORY_LAYER
         super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
+        self.inv_type = inv_type
+        from gui.base import GameUI
+        self.gameui: GameUI = gameui
         if VERBOSE:
             log("Inv: %s %s W %s" % (h_margin_cells, v_margin_cells, width_cells))
         self.rows = rows
@@ -37,28 +97,60 @@ class Inventory(Display):
         self.box_color = box_color
         self.tile_group = pygame.sprite.LayeredUpdates()
         from gui import base
-        self.items: [[base.Tile]] = []
+        # self.items: [[base.Tile]] = []
         # self.items: [[Tile]] = [[None for _ in range(cols)] for _ in range(rows)]
+        self.slots_group = pygame.sprite.LayeredUpdates()
         self.inv_slots: [[Inventory.Slot]] = []
         for x, y in itertools.product(range(rows), range(cols)):
             if x >= len(self.inv_slots):
                 self.inv_slots.append([])
-            if x >= len(self.items):
-                self.items.append([])
-
-            self.items[x].append(None)
-            self.inv_slots[x].append(
-                Inventory.Slot(self.x + (self.box_size + self.border) * y + self.border,
+            # if x >= len(self.items):
+            #     self.items.append([])
+            #
+            # self.items[x].append(None)
+            s = Inventory.Slot(self,
+                               self.x + (self.box_size + self.border) * y + self.border,
                                self.y + (self.box_size + self.border) * x + self.border,
                                self.box_size, self.box_size,
                                self.box_color)
-            )
+            self.inv_slots[x].append(s)
+            self.slots_group.add(s, layer=SLOT_LAYER)
         self.dv_font = pygame.font.SysFont("comicsans", 50)
         self.display_dollar_value = display_dollar_value
         self.dollar_value_txt = self.dv_font.render(f"", 1, (0, 0, 0))
 
-        self._layer = 2
         self.refresh_dims()
+        self.rect = pygame.rect.Rect(self.x, self.y, self.width, self.height)
+
+    def __repr__(self):
+        return str(self.inv_type)
+
+    def __str__(self):
+        return self.__repr__()
+
+    def foreach_slot(self, f):
+        for r_slots in self.inv_slots:
+            for s in r_slots:
+                f(s)
+
+    def foreach_filled_slot(self, f):
+        for r_slots in self.inv_slots:
+            for s in r_slots:
+                if s.is_filled():
+                    f(s)
+
+    def find_in_slots(self, f):
+        for row, r_slots in enumerate(self.inv_slots):
+            for col, s in enumerate(r_slots):
+                if f(s):
+                    return row, col
+        return None
+
+    def map_filled_slots(self, f):
+        for r_slots in self.inv_slots:
+            for s in r_slots:
+                if s.is_filled():
+                    yield f(s)
 
     # draw everything
     def draw(self, win):
@@ -67,34 +159,37 @@ class Inventory(Display):
         pygame.draw.rect(win, self.border_color.value,
                          (self.x, self.y, (self.box_size + self.border) * self.col + self.border,
                           (self.box_size + self.border) * self.rows + self.border))
-        for x in range(self.rows):
-            for y in range(self.col):
-                # rect = (self.x + (self.box_size + self.border) * y + self.border,
-                #         self.y + (self.box_size + self.border) * x + self.border, self.box_size, self.box_size)
-                # pygame.draw.rect(win, self.box_color.value, rect)
+        self.foreach_slot(lambda s: s.draw(win))
+        self.tile_group.draw(win)
 
-                if self.items[x][y] is not None:
-                    from gui.base import Tile
-                    __t: Tile = self.items[x][y]
-                    if __t.clicked:
-                        pos = pygame.mouse.get_pos()
-                        self.items[x][y].rect.x = pos[0] - (self.items[x][y].rect.width / 2.4)
-                        self.items[x][y].rect.y = pos[1] - (self.items[x][y].rect.height / 2.4)
-                        __t.init = False
-                        # break  # prevents more than one tile at a time
-                    elif __t.init:
-                        _s: Inventory.Slot = self.inv_slots[x][y]
-                        __t.update_rect(_s.x, _s.y)
-                    #     # __t.update_rect(self.x + ((self.box_size + self.border) * (y + 0.5)),
-                    #     #                 self.rect[1] + INIT_TILE_SIZE + self.border + 5)
-                    elif self.items[x][y].inBox(self):
-                        # self.items[x][y].rect.topleft = (self.x + (x * (self.box_size + self.border)), self.y)
-                        _s: Inventory.Slot = self.inv_slots[x][y]
-                        self.items[x][y].rect.topleft = (_s.x, _s.y)
-                # else:
-                    #     self.items[x][y] = None
-                else:
-                    self.inv_slots[x][y].draw(win)
+        # for x in range(self.rows):
+        #     for y in range(self.col):
+        #         # rect = (self.x + (self.box_size + self.border) * y + self.border,
+        #         #         self.y + (self.box_size + self.border) * x + self.border, self.box_size, self.box_size)
+        #         # pygame.draw.rect(win, self.box_color.value, rect)
+        #
+        #         if self.items[x][y] is not None:
+        #             from gui.base import Tile
+        #             __t: Tile = self.items[x][y]
+        #             if __t.clicked:
+        #                 pos = pygame.mouse.get_pos()
+        #                 self.items[x][y].rect.x = pos[0] - (self.items[x][y].rect.width / 2.4)
+        #                 self.items[x][y].rect.y = pos[1] - (self.items[x][y].rect.height / 2.4)
+        #                 __t.init = False
+        #                 # break  # prevents more than one tile at a time
+        #             elif __t.init:
+        #                 _s: Inventory.Slot = self.inv_slots[x][y]
+        #                 __t.update_rect(_s.x, _s.y)
+        #             #     # __t.update_rect(self.x + ((self.box_size + self.border) * (y + 0.5)),
+        #             #     #                 self.rect[1] + INIT_TILE_SIZE + self.border + 5)
+        #             elif self.items[x][y].inBox(self):
+        #                 # self.items[x][y].rect.topleft = (self.x + (x * (self.box_size + self.border)), self.y)
+        #                 _s: Inventory.Slot = self.inv_slots[x][y]
+        #                 self.items[x][y].rect.topleft = (_s.x, _s.y)
+        #         # else:
+        #             #     self.items[x][y] = None
+        #         else:
+        #             self.inv_slots[x][y].draw(win)
 
         win.blit(self.dollar_value_txt,
                  (self.x + (self.col * (self.box_size + self.border)) + self.border + 10,
@@ -104,7 +199,7 @@ class Inventory(Display):
         # self.items[x][y].image = pygame.transform.scale(self.items[x][y].image, (100,100))
 
     # get the square that the mouse is over
-    def Get_pos(self):
+    def get_pos(self):
         mouse = pygame.mouse.get_pos()
         x = mouse[0] - self.x
         y = mouse[1] - self.y
@@ -115,21 +210,21 @@ class Inventory(Display):
         return int(x), int(y)
 
     # add an item/s
-    def Add(self, item, xy=None):
-        import gui
+    def add_tile(self, item, xy=None):
+        import gui.base
         assert isinstance(item, gui.base.Tile)
         if xy is None:
             # find the next available slot
-            for i, j in itertools.product(range(self.rows), range(self.col)):
-                if self.items[i][j] is None:
-                    self.items[i][j] = item
-                    self.tile_group.add(item)
-                    break
+            r, c = self.find_in_slots(lambda s: s.is_empty())
+            s = self.inv_slots[r][c]
+            assert isinstance(s, Inventory.Slot)
+            s.add_or_move_tile(item)
+            self.tile_group.add(item, layer=TILE_LAYER)
         else:
             x, y = xy
             # item already there
             # 'x' is col and 'y' is row
-            if self.items[y][x] is not None:
+            if self.inv_slots[y][x].is_filled():
                 # if self.items[x][y].letter == Item.letter:
                 #     print("same letter")
                 #     print(Item.letter)
@@ -139,28 +234,31 @@ class Inventory(Display):
                 #
                 #     print("different letters are ")
                 #     return temp
-                log("tile already there")
+                log(f"{self.inv_slots[y][x].slot_tile.letter} tile already there")
+                item.return_to_base()
+                return False
             else:
                 # 'x' is col and 'y' is row
-                self.items[y][x] = item
+                self.inv_slots[y][x].add_tile(item)
                 self.tile_group.add(item)
         self.refresh_dollar_value()
+        return True
 
     def remove_tile(self, item):
         import gui
         assert isinstance(item, gui.base.Tile)
 
-        for i, j in itertools.product(range(self.rows), range(self.col)):
-            from gui.base import Tile
-            x: Tile = self.items[i][j]
-            if x is not None and x.id == item.id:
-                self.items[i][j] = None
-                self.tile_group.remove(item)
+        rc = self.find_in_slots(lambda s: s.is_filled() and s.slot_tile.id == item.id)
+        if rc is None:
+            return
+        r, c = rc
+        self.inv_slots[r][c].remove_tile()
+        self.tile_group.remove(item)
         self.refresh_dollar_value()
 
     # check whether the mouse in in the grid
-    def In_grid(self, x, y):
-        # print(f" x is {x} \n y is {y}\n cols {self.col -1 }\n rows {self.rows - 1 }")
+    def in_grid(self, x, y):
+        print(f" x is {x} \n y is {y}\n cols {self.col -1 }\n rows {self.rows - 1 }")
         if 0 > x or x > self.col - 1:
             # print("wawaa")
             return False
@@ -204,11 +302,9 @@ class Inventory(Display):
         return tiles
 
     def get_word(self, row=0) -> str:
-        assert row < len(self.items)
-        word = ""
-        for t in self.items[row]:
-            word = word + t.letter if t is not None else word
-        # log(word)
+        assert row < len(self.inv_slots)
+        word = "".join(map(lambda s: s.slot_tile.letter if s.is_filled() else "",
+                           self.inv_slots[row]))
         return word
 
     def refresh_dims(self):
@@ -218,32 +314,33 @@ class Inventory(Display):
             print("%s " % self.box_size)
 
     def clear(self):
-        for i in range(self.rows):
-            for j in range(self.col):
-                self.items[i][j] = None
+        self.foreach_filled_slot(lambda s: s.remove_tile())
         self.tile_group.empty()
         self.refresh_dollar_value()
 
-    def contains_letter(self, letter: str) -> bool:
-        from gui.base import Tile
-        for r, c in itertools.product(range(self.rows), range(self.col)):
-            item = self.items[r][c]
-            if item is not None:
-                assert isinstance(item, Tile)
-                if item.letter == letter:
-                    return True
-
-        return False
+    def contains_letter(self, tile) -> bool:
+        import common.game as svr_objs
+        assert isinstance(tile, svr_objs.Tile)
+        svr_tile: svr_objs.Tile = tile
+        return self.find_in_slots(
+            lambda s: s.is_filled() and s.slot_tile.id == svr_tile.get_tile_id()
+        ) is not None
 
     def refresh_dollar_value(self):
         if not self.display_dollar_value:
             return
-        total = 0
-        for i, j in itertools.product(range(self.rows), range(self.col)):
-            if self.items[i][j] is not None:
-                total += self.items[i][j].score
+        # total = 0
+        total = sum(self.map_filled_slots(lambda s: s.slot_tile.score))
+        # itertools.accumulate(xx,
+        #                      lambda t, v: t + v, initial=0)
+
+        # for i, j in itertools.product(range(self.rows), range(self.col)):
+        #     if self.items[i][j] is not None:
+        #         total += self.items[i][j].score
         if total > 0:
             total *= total
             self.dollar_value_txt = self.dv_font.render(f"${total}", 1, (0, 0, 0))
+            self.gameui.notify_inv_value(self, total)
         else:
             self.dollar_value_txt = self.dv_font.render("", 1, (0, 0, 0))
+            self.gameui.notify_inv_value(self, total)

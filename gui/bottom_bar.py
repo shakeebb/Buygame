@@ -20,26 +20,31 @@ class BottomBar(Display):
         self.BORDER_THICKNESS = 5
         from gui.base import GameUI
         self.game: GameUI = game
-        button_features = (5 * TILE_ADJ_MULTIPLIER, 1.5 * TILE_ADJ_MULTIPLIER, Colors.DARK_GRAY)
+        button_features = (5 * TILE_ADJ_MULTIPLIER, 1.5 * TILE_ADJ_MULTIPLIER, Colors.GREEN)
         # self.backtome = TextButton(h_margin_cells + 1,
         #                            v_margin_cells + 1, *button_features, " Return ",
         #                            Colors.ORANGE)
         equal_parts = width_cells // 4
-        button_h_pos = equal_parts * 1.7
+        button_h_pos = equal_parts * 1.1
         button_v_pos = self.v_margin_cells - (5 * TILE_ADJ_MULTIPLIER)
-        controls = [[(" Roll ", -9, 1), (" Cancel ", -5 + 4, 1)],
-                    [("Create", -9, 3), (" Chat ", -5, 3)]
+        controls = [(" Roll ", -9, 1),
+                    (" Discard ", -5 + 4, 1),
+                    (" End Turn ", -5 + 8, 1),
                     ]
 
-        self.help_button = TextButton(self.h_margin_cells + button_h_pos,
-                                      button_v_pos,
-                                      *button_features, controls[0][0][0])
-
-        self.remove_button = TextButton(self.h_margin_cells + (button_h_pos * 1.4),
+        self.action_button = TextButton(self.h_margin_cells + button_h_pos,
                                         button_v_pos,
-                                        *button_features, controls[0][1][0])
+                                        *button_features, controls[0][0])
 
-        self.option_button = RadioButton(self.h_margin_cells + (button_h_pos * 1.4),
+        self.discard_button = TextButton(self.h_margin_cells + (button_h_pos * 1.6),
+                                         button_v_pos,
+                                         *button_features, controls[1][0])
+
+        self.end_turn_button = TextButton(self.h_margin_cells + (button_h_pos * 2.2),
+                                          button_v_pos,
+                                          *button_features, controls[2][0])
+
+        self.option_button = RadioButton(self.h_margin_cells + (button_h_pos * 1.6),
                                          button_v_pos - 1.5,
                                          2 * TILE_ADJ_MULTIPLIER, 4.3 * TILE_ADJ_MULTIPLIER,
                                          on_display=False)
@@ -82,9 +87,10 @@ class BottomBar(Display):
     def draw(self, win):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
         self.option_button.draw(win)
-        self.help_button.draw(win)
+        self.action_button.draw(win)
+        self.discard_button.draw(win)
         # self.backtome.draw(win)
-        self.remove_button.draw(win)
+        self.end_turn_button.draw(win)
         # self.createbutton.draw(win)
         # self.chatbutton.draw(win)
         self.dice.draw() if self.dice else None
@@ -97,49 +103,52 @@ class BottomBar(Display):
         mouse = pygame.mouse.get_pos()
         if self.option_button.on_display:
             self.option_button.click(*mouse)
-            if self.help_button.click(*mouse):
+            if self.action_button.click(*mouse):
                 self.hide_input_prompt()
 
             # don't allow click anywhere else
             return
 
-        if self.__enable_dice_rolling and self.help_button.click(*mouse):
+        if self.__enable_dice_rolling and self.action_button.click(*mouse):
             # choices = [("Choose Dice ", self.choose_dice()), ("cancel", None)]
             # thorpy.launch_blocking_choices("Help!\n",
             #                                choices)
             if not self.dice:
                 self.dice = Dice(self.game,
-                                 self.help_button.x - (4 * INIT_TILE_SIZE * TILE_ADJ_MULTIPLIER),
-                                 self.help_button.y,
+                                 self.action_button.x - (4 * INIT_TILE_SIZE * TILE_ADJ_MULTIPLIER),
+                                 self.action_button.y,
                                  100, 0.2)
                 self.dice.draw()
                 self.dice.roll(self.rand.randint(5, 15))
                 return
 
         if self.__enable_buy:
-            if self.help_button.click(*mouse):
+            if self.action_button.click(*mouse):
                 self.game.ui_game_status = GameUIStatus.BUY
                 self.hide_all()
                 return
-            elif self.remove_button.click(*mouse):
+            elif self.discard_button.click(*mouse):
                 self.__enable_buy = False
-                self.game.ui_game_status = GameUIStatus.CANCEL_BUY
+                self.game.ui_game_status = GameUIStatus.SKIP_BUY
                 self.hide_all()
                 return
 
         if self.__enable_sell:
-            if self.help_button.click(*mouse):
+            if self.action_button.click(*mouse):
                 self.game.ui_game_status = GameUIStatus.SELL
                 self.hide_all()
                 return
-            elif self.remove_button.click(*mouse):
-                self.game.ui_game_status = GameUIStatus.CANCEL_SELL
+            elif self.discard_button.click(*mouse):
+                self.game.ui_game_status = GameUIStatus.DISCARD_SELL
                 self.hide_all()
+                return
+            elif self.end_turn_button.click(*mouse):
+                self.game.ui_game_status = GameUIStatus.END_TURN
                 return
 
         # if self.backtome.click(*mouse):
         #     self.game.myrack.returntome(self.game.tileList)
-        if self.remove_button.click(*mouse):
+        if self.discard_button.click(*mouse):
             self.game.tileList.empty()
         # if self.createbutton.click(*mouse):
         #     self.game.inventory.get_word()
@@ -163,7 +172,7 @@ class BottomBar(Display):
 
     def prompt_input(self):
         self.game.top_bar.client_msgs.add_msg("Your Choice. Enter between 2 to 5")
-        self.help_button.set_text(" Choose ")
+        self.action_button.set_text(" Choose ")
         self.option_button.show()
         self.game.ui_game_status = GameUIStatus.PROMPT_DICE_INPUT
         # enable input field & validate
@@ -186,38 +195,56 @@ class BottomBar(Display):
     def enable_dice_rolling(self):
         self.last_rolled_dice_no = -2
         self.__enable_dice_rolling = True
-        self.help_button.set_text(" ROLL ")
-        self.help_button.set_color(Colors.GREEN)
-        self.help_button.show()
+        self.action_button.set_text(" ROLL ")
+        self.action_button.show()
+        self.action_button.enable()
 
-    def enable_buy(self):
+    def show_buy(self, enabled=True):
         self.__enable_buy = True
-        self.help_button.set_text(" BUY ")
-        self.help_button.set_color(Colors.GREEN)
-        self.remove_button.set_text(" CANCEL ")
-        self.remove_button.set_color(Colors.GREEN)
-        self.help_button.show()
-        self.remove_button.show()
+        self.action_button.set_text(" BUY ")
+        self.action_button.set_color(Colors.GREEN)
+        self.discard_button.set_text(" SKIP ")
+        self.discard_button.set_color(Colors.GREEN)
+        self.action_button.show()
+        self.discard_button.show()
+        if enabled:
+            self.enable_action()
+        else:
+            self.disable_action()
 
-    def enable_sell(self):
+    def show_sell(self, enabled=False):
         self.__enable_sell = True
-        self.help_button.set_text(" SELL ")
-        self.help_button.set_color(Colors.GREEN)
-        self.remove_button.set_text(" CANCEL ")
-        self.remove_button.set_color(Colors.GREEN)
-        self.help_button.show()
-        self.remove_button.show()
+        self.action_button.set_text(" SELL ")
+        self.action_button.set_color(Colors.GREEN)
+        self.discard_button.set_text(" DISCARD ")
+        self.discard_button.set_color(Colors.GREEN)
+        self.action_button.show()
+        self.discard_button.show()
+        self.end_turn_button.show()
+        if enabled:
+            self.enable_action()
+        else:
+            self.disable_action()
+
+    def enable_action(self):
+        self.action_button.enable()
+        self.discard_button.enable()
+
+    def disable_action(self):
+        self.action_button.disable()
+        self.discard_button.disable()
 
     def hide_all(self):
         self.__enable_dice_rolling = False
         self.__enable_buy = False
         self.__enable_sell = False
 
-        self.help_button.set_text("  -- ")
-        self.help_button.set_color(Colors.DARK_GRAY)
-        self.remove_button.set_text(" -- ")
-        self.remove_button.set_color(Colors.DARK_GRAY)
+        # self.action_button.set_text("  -- ")
+        # self.action_button.set_color(Colors.DARK_GRAY)
+        # self.end_turn_button.set_text(" -- ")
+        # self.end_turn_button.set_color(Colors.DARK_GRAY)
 
-        self.help_button.hide()
-        self.remove_button.hide()
+        self.action_button.hide()
+        self.discard_button.hide()
+        self.end_turn_button.hide()
         self.option_button.hide()

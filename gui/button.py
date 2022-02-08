@@ -20,11 +20,13 @@ class Button(Display):
     #     self.height = height
     #     self.width = width
         self.bg_color = bg_color
+        self.display_color = fill_color
         self.fill_color = fill_color
         self.border_color = border_color
         self.BORDER_WIDTH = 2
         self.on_display = on_display
         self.cleared = False
+        self.enabled = True
 
     def refresh_dims(self):
         pass
@@ -57,7 +59,7 @@ class Button(Display):
         :param y: float
         :return: bool
         """
-        if not self.on_display:
+        if not self.on_display or not self.enabled:
             return False
 
         if self.x <= x <= self.x + self.width and self.y <= y <= self.y + self.height:
@@ -72,6 +74,14 @@ class Button(Display):
     def hide(self):
         self.on_display = False
         self.cleared = False
+
+    def enable(self):
+        self.fill_color = self.display_color
+        self.enabled = True
+
+    def disable(self):
+        self.fill_color = Colors.LTR_GRAY
+        self.enabled = False
 
 
 class TextButton(Button):
@@ -251,7 +261,8 @@ class MessageBox(pygame.sprite.Sprite):
     def __init__(self, parent_width: int, parent_height: int, width: int, height: int,
                  msg: str,
                  ok_text: str,
-                 in_display: bool = False, on_ok=None, color = Colors.RED):
+                 in_display: bool = False, on_ok=None, color=Colors.RED,
+                 blink=False):
         super(MessageBox, self).__init__()
         self.font = pygame.font.SysFont("comicsans", 17)
         self.f_color = color
@@ -296,6 +307,8 @@ class MessageBox(pygame.sprite.Sprite):
                                     Colors.YELLOW, ok_text,
                                     Colors.YELLOW)
         self.on_ok = on_ok
+        self.blink = blink
+        self.blink_fps = FPS if blink else -1
 
     def show(self):
         self.in_display = True
@@ -318,8 +331,17 @@ class MessageBox(pygame.sprite.Sprite):
         # if self.in_display:
         pygame.draw.rect(win, self.fc.value, (self.x, self.y, self.w, self.h), 0)
         pygame.draw.rect(win, self.bc.value, (self.x, self.y, self.w, self.h), 1)
-        for i, s in enumerate(self.msgs):
-            win.blit(s, (self.l_x, self.l_y + (i * 10 * TILE_ADJ_MULTIPLIER)))
+        draw = True
+        if self.blink:
+            if FPS < self.blink_fps <= 2*FPS:
+                draw = False
+                self.blink_fps += -2*FPS if self.blink_fps == 2*FPS else 1
+            else:
+                self.blink_fps += 1
+
+        if draw:
+            for i, s in enumerate(self.msgs):
+                win.blit(s, (self.l_x, self.l_y + (i * 10 * TILE_ADJ_MULTIPLIER)))
         self.ok_button.draw(win)
 
 

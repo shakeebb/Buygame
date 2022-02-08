@@ -75,6 +75,9 @@ def receive_pickle(client_socket):
             except BrokenPipeError as bpe:
                 log(f"Unable to read std header in {calling_func_name(1)}:- {bpe.__str__()}")
                 return False
+            except ConnectionResetError as cre:
+                log(f"Unable to read std header in {calling_func_name(1)}:- {cre.__str__()}")
+                return False
         assert msg_type == ObjectType.OBJECT
 
         # print("message_length", message_length)

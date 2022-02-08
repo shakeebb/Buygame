@@ -101,15 +101,15 @@ class ClientUtils:
             return GameUIStatus.BUY_FAILED, game
 
     @staticmethod
-    def cancel_buy(game: Game, network: Network,
-                   notify_srv_msg: default_notification,
-                   notify_cln_msg: default_notification):
-        ret_game = network.send(ClientMsgReq.Cancel_Buy.msg)
+    def skip_buy(game: Game, network: Network,
+                 notify_srv_msg: default_notification,
+                 notify_cln_msg: default_notification):
+        ret_game = network.send(ClientMsgReq.Skip_Buy.msg)
         assert ret_game is not None and isinstance(ret_game, Game)
         game = ret_game
         serverMessage = game.get_server_message()
         notify_srv_msg(f"{serverMessage} ")
-        if ClientResp.Buy_Cancelled.msg in serverMessage:
+        if ClientResp.Buy_Skipped.msg in serverMessage:
             notify_cln_msg("Buy cancelled.")
             return GameUIStatus.BUY_CANCELLED, game
         else:
@@ -138,13 +138,9 @@ class ClientUtils:
         player: Player = game.players()[number]
         # serverMessage = game.get_server_message()
         if player.txn_status == Txn.SOLD:
-            ret_status = GameUIStatus.SOLD
-        elif player.txn_status == Txn.SOLD_SELL_AGAIN:
-            ret_status = GameUIStatus.SELL_AGAIN
-        # messagebox_notify(f"Sold for {player.wordvalue}. You have ${player.money}", Colors.GREEN)
-            # break
-        elif player.txn_status == Txn.SELL_CANCELLED_SELL_AGAIN:
-            ret_status = GameUIStatus.SELL_AGAIN
+            ret_status = GameUIStatus.SHOW_SELL
+        # elif player.txn_status == Txn.SELL_CANCELLED_SELL_AGAIN:
+        #     ret_status = GameUIStatus.SELL_AGAIN
         else:
             # attempt -= 1
             notify_cln_msg(
@@ -152,30 +148,46 @@ class ClientUtils:
                 Colors.RED
             )
             # messagebox_notify(f"Sell failed. You have ${player.money}", Colors.RED)
-            ret_status = GameUIStatus.SELL_FAILED
+            ret_status = GameUIStatus.SHOW_SELL
 
         notify_cln_msg("You now have: $%s" % player.money)
         # %% done selling
         return ret_status, game
 
     @staticmethod
-    def cancel_sell(network: Network,
-                    notify_srv_msg: default_notification,
-                    notify_cln_msg: default_notification):
-        ret_game = network.send(ClientMsgReq.Cancel_Sell.msg)
+    def discard_sell(network: Network, discarded_word: str,
+                     notify_srv_msg: default_notification,
+                     notify_cln_msg: default_notification):
+        ret_game = network.send(ClientMsgReq.Discard_Sell.msg + discarded_word)
         assert ret_game is not None and isinstance(ret_game, Game)
         game = ret_game
         serverMessage = game.get_server_message()
         notify_srv_msg(f"{serverMessage} ")
         ret_status = None
-        if ClientResp.Sell_Cancelled_Sell_Again.msg in serverMessage:
-            notify_cln_msg("Sell cancelled. Sell again")
-            ret_status = GameUIStatus.SELL_AGAIN
-        elif ClientResp.Sell_Cancelled.msg in serverMessage:
+        if ClientResp.Sell_Discarded.msg in serverMessage:
             notify_cln_msg("Sell cancelled")
-            ret_status = GameUIStatus.I_PLAYED
+            ret_status = GameUIStatus.SHOW_SELL
         else:
             notify_cln_msg("Sell couldn't be cancelled.")
+
+        return ret_status, game
+
+    @staticmethod
+    def end_turn(network: Network,
+                 notify_srv_msg: default_notification,
+                 notify_cln_msg: default_notification):
+        ret_game = network.send(ClientMsgReq.EndTurn.msg)
+        assert ret_game is not None and isinstance(ret_game, Game)
+        game = ret_game
+        serverMessage = game.get_server_message()
+        notify_srv_msg(f"{serverMessage} ")
+        ret_status = None
+        if ClientResp.Turn_Ended.msg in serverMessage:
+            notify_cln_msg("Turn Ended")
+            ret_status = GameUIStatus.I_PLAYED
+        elif ClientResp.Must_Sell.msg in serverMessage:
+            notify_cln_msg("Must sell")
+            ret_status = GameUIStatus.SHOW_SELL
 
         return ret_status, game
 
