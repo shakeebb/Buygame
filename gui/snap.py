@@ -1,7 +1,9 @@
 import itertools
+from typing import Optional
 
 import pygame
 
+import common.tile
 from common.logger import log
 from gui.display import Display
 from common.gameconstants import VERBOSE, Colors, SLOT_LAYER, INVENTORY_LAYER, TILE_LAYER, MOVING_TILE_LAYER, \
@@ -20,8 +22,8 @@ class Inventory(Display):
             self.height = height
             self.fill_color = fill_color
             self.rect_dims = (self.x, self.y, self.width, self.height)
-            from gui.base import Tile
-            self.slot_tile: Tile = None
+            from gui.uiobjects import UITile
+            self.slot_tile: Optional[UITile] = None
             self.rect = pygame.rect.Rect(*self.rect_dims)
             self.inv: Inventory = inv
 
@@ -34,25 +36,15 @@ class Inventory(Display):
 
         def draw(self, win):
             pygame.draw.rect(win, self.fill_color.value, self.rect_dims)
-            if self.is_filled():
-                if self.slot_tile.clicked:
-                    r = self.slot_tile.rect
-                    mx, my = pygame.mouse.get_pos()
-                    (r.x, r.y) = (mx - r.width/2.4, my - r.height/2.4)
-                    # self.slot_tile.init = False
-                # elif self.slot_tile.init:
-                #     self.slot_tile.update_rect(self.x, self.y)
-                #     # __t.update_rect(self.x + ((self.box_size + self.border) * (y + 0.5)),
-                #     #                 self.rect[1] + INIT_TILE_SIZE + self.border + 5)
-                # elif self.slot_tile.inBox(self):
-                #     # self.items[x][y].rect.topleft = (self.x + (x * (self.box_size + self.border)), self.y)
-                #     self.slot_tile.rect.topleft = (self.x, self.y)
-
-                # self.slot_tile.draw(win)
+            # if self.is_filled():
+            #     if self.slot_tile.clicked:
+            #         r = self.slot_tile.rect
+            #         mx, my = pygame.mouse.get_pos()
+            #         (r.x, r.y) = (mx - r.width/2.4, my - r.height/2.4)
 
         def add_or_move_tile(self, tile):
-            from gui.base import Tile
-            assert isinstance(tile, Tile)
+            from gui.uiobjects import UITile
+            assert isinstance(tile, UITile), f"{type(tile)}"
             assert self.is_empty()
 
             # update the tile slot first, so that if
@@ -85,7 +77,7 @@ class Inventory(Display):
         self._layer = INVENTORY_LAYER
         super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
         self.inv_type = inv_type
-        from gui.base import GameUI
+        from gui.gameui import GameUI
         self.gameui: GameUI = gameui
         if VERBOSE:
             log("Inv: %s %s W %s" % (h_margin_cells, v_margin_cells, width_cells))
@@ -211,20 +203,22 @@ class Inventory(Display):
 
     # add an item/s
     def add_tile(self, item, xy=None):
-        import gui.base
-        assert isinstance(item, gui.base.Tile)
+        from gui.uiobjects import UITile
+        assert isinstance(item, UITile), f"{type(item)} not UITile type"
         if xy is None:
             # find the next available slot
-            r, c = self.find_in_slots(lambda s: s.is_empty())
-            s = self.inv_slots[r][c]
-            assert isinstance(s, Inventory.Slot)
-            s.add_or_move_tile(item)
+            r, c = self.find_in_slots(lambda _s: _s.is_empty())
+            slot = self.inv_slots[r][c]
+            assert isinstance(slot, Inventory.Slot)
+            slot.add_or_move_tile(item)
             self.tile_group.add(item, layer=TILE_LAYER)
         else:
             x, y = xy
             # item already there
             # 'x' is col and 'y' is row
-            if self.inv_slots[y][x].is_filled():
+            slot = self.inv_slots[y][x]
+            assert isinstance(slot, Inventory.Slot)
+            if slot.is_filled():
                 # if self.items[x][y].letter == Item.letter:
                 #     print("same letter")
                 #     print(Item.letter)
@@ -245,10 +239,10 @@ class Inventory(Display):
         return True
 
     def remove_tile(self, item):
-        import gui
-        assert isinstance(item, gui.base.Tile)
+        from gui.uiobjects import UITile
+        assert isinstance(item, UITile)
 
-        rc = self.find_in_slots(lambda s: s.is_filled() and s.slot_tile.id == item.id)
+        rc = self.find_in_slots(lambda s: s.is_filled() and s.slot_tile.t_id == item.t_id)
         if rc is None:
             return
         r, c = rc
@@ -319,11 +313,10 @@ class Inventory(Display):
         self.refresh_dollar_value()
 
     def contains_letter(self, tile) -> bool:
-        import common.game as svr_objs
-        assert isinstance(tile, svr_objs.Tile)
-        svr_tile: svr_objs.Tile = tile
+        assert isinstance(tile, common.tile.Tile)
+        svr_tile: common.tile.Tile = tile
         return self.find_in_slots(
-            lambda s: s.is_filled() and s.slot_tile.id == svr_tile.get_tile_id()
+            lambda s: s.is_filled() and s.slot_tile.t_id == svr_tile.get_tile_id()
         ) is not None
 
     def refresh_dollar_value(self):

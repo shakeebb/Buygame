@@ -3,7 +3,7 @@ Represents the leaderboard object for the client side of the game.
 """
 import pygame
 
-from common.game import Player
+from common.player import Player
 from common.gameconstants import *
 from gui.display import Display
 

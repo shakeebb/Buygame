@@ -1,7 +1,7 @@
 from datetime import datetime
 from socket import socket
 
-from common.game import Player
+from common.player import Player
 
 
 class ClientSocket:

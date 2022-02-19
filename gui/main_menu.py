@@ -1,17 +1,16 @@
 """
 Shows the main menu for the game, gets the user name before starting
 """
-import os
 import sys
-import time
-from enum import Enum, auto
-from pathlib import Path
+from typing import Optional
 
 import pygame
-from pygame.locals import *
+import pygame_widgets
+from pygame.event import Event
+from pygame_widgets.button import Button
+from pygame_widgets.widget import WidgetBase
 
-from common.gameconstants import MAX_NAME_LENGTH, CLIENT_SETTINGS_FILE, CLIENT_SETTINGS_TEMPLATE, Colors, \
-    CLIENT_DEFAULT_SETTINGS_FILE, INIT_TILE_SIZE, TILE_ADJ_MULTIPLIER, WelcomeState
+from common.gameconstants import *
 from common.logger import log, logger
 from common.utils import write_file
 from gui.button import TextButton, MessageBox, InputText, RadioButton
@@ -28,7 +27,7 @@ class MainMenu:
         Display.init()
         self.surface = Display.surface()
         self.controls: [InputText] = []
-        self.user_choices: RadioButton = None
+        self.user_choices: Optional[RadioButton] = None
         self.cur_input_field = 0
 
         write_file(CLIENT_DEFAULT_SETTINGS_FILE, lambda _f:
@@ -53,11 +52,13 @@ class MainMenu:
             except yaml.YAMLError as exc:
                 log("settings.yaml error ", exc)
                 pygame.quit()
+        self.widgets: [WidgetBase] = []
         self.create_screen_layout()
         self.messagebox = None
 
     def on_user_choice(self, o: RadioButton.Option):
-        self.controls[0].set_text(o.caption)
+        if len(self.controls) > 1:
+            self.controls[0].set_text(o.caption)
 
     def create_screen_layout(self):
         def_usr = ""
@@ -76,6 +77,7 @@ class MainMenu:
                                             fill_color=Colors.WHITE)
             for u in _users:
                 self.user_choices.add_option(u)
+                def_usr = u if len(def_usr) == 0 else def_usr
             self.user_choices.show()
 
         self.controls.append(InputText(200, 300,
@@ -91,8 +93,32 @@ class MainMenu:
                                        "Connect to Server Port: ",
                                        self.game_settings['target_server_defaults']['port']))
 
+        self.widgets.append(
+            Button(
+                # Mandatory Parameters
+                self.surface,  # Surface to place button on
+                self.surface.get_width()/2-120,  # X-coordinate of top left corner
+                650,  # Y-coordinate of top left corner
+                120,  # Width
+                50,  # Height
+
+                # Optional Parameters
+                text='Login',  # Text to display
+                fontSize=22,  # Size of font
+                margin=20,  # Minimum distance between text/image and edge of button
+                inactiveColour=Colors.LT_GRAY.value,  # Colour of button when not being interacted with
+                hoverColour=Colors.LTR_GRAY.value,  # Colour of button when being hovered over
+                pressedColour=Colors.GRAY.value,  # Colour of button when being clicked
+                radius=15,  # Radius of border corners (leave empty for not curved)
+                onClick=self.login,  # Function to call when clicked on
+                onClickParams=()
+            )
+        )
+
+    def login(self):
+        self.wc_state = WelcomeState.INPUT_COMPLETE
+
     def draw(self):
-        self.surface.fill(self.BG)
         display_width, display_height = Display.dims()
         title = Display.title("Welcome to BuyGame !")
         self.surface.blit(title, (display_width / 2 - title.get_width() / 2, 50))
@@ -116,15 +142,15 @@ class MainMenu:
         if self.wc_state == WelcomeState.GAME_CONNECT:
             log("done display")
 
-    def run(self):
+    def run(self, input_game=None):
         run = True
         clock = pygame.time.Clock()
-        from gui.base import GameUI
-        g: GameUI = None
+        from gui.gameui import GameUI
+        assert input_game is None or isinstance(input_game, GameUI)
+        g: GameUI = input_game
         logger.reset()
         while run:
-            clock.tick(30)
-            self.draw()
+            clock.tick(FPS)
             if self.wc_state == WelcomeState.INPUT_COMPLETE:
                 # response = self.n.send({-1:[]})
                 # if response:
@@ -138,33 +164,42 @@ class MainMenu:
                     # g.players.append(p)
                     g.handshake()
                     g.main()
-                except OSError as e:
+                except (OSError, OverflowError) as e:
                     if self.messagebox is None:
-                        if e.errno == 61:
+                        if isinstance(e, OSError) and e.errno == 61:
                             msg = f"- Server unavailable. Check [{g.ip}:{g.port}] is correct"
+                        elif isinstance(e, OSError) and e.errno == 8:
+                            msg = f"- Invalid server address. Check [{g.ip}:{g.port}."
                         else:
                             msg = f"- {e}"
                         self.messagebox = MessageBox(self.surface.get_width(), self.surface.get_height(),
                                                      20, 5,
                                                      msg,
                                                      "ok",
-                                                     on_ok=lambda : sys.exit(1))
+                                                     blink=True
+                                                     # ,on_ok=lambda: sys.exit(1)
+                                                     )
                         self.messagebox.show()
-                        self.wc_state = WelcomeState.USER_ERR_CONFIRM
-                        # self.wc_state.set_exception(e)
-                    time.sleep(1)
+                        self.cur_input_field = 0
+                        self.controls[self.cur_input_field].begin_input()
+                        if self.user_choices is not None:
+                            self.user_choices.show()
+                finally:
+                    g = input_game
 
             # %% GameUI delegation end
+            events = pygame.event.get()
 
-            for event in pygame.event.get():
+            for event in events:
                 if event.type == pygame.MOUSEBUTTONUP:
                     mouse = pygame.mouse.get_pos()
                     if self.messagebox is not None:
                         if self.messagebox.button_events(*mouse):
+                            self.messagebox.destroy(self.surface)
                             self.messagebox = None
-                            self.wc_state = WelcomeState.QUIT
-                            run = False
-                            pygame.quit()
+                            # self.wc_state = WelcomeState.QUIT
+                            # run = False
+                            # pygame.quit()
                         continue  # modal dialog box.
 
                     if self.user_choices is not None:
@@ -173,36 +208,84 @@ class MainMenu:
                 if event.type == pygame.QUIT or \
                         (event.type == KEYUP and event.key == K_ESCAPE):
                     run = False
-                    pygame.quit()
+                    quit()
+
                 if event.type == VIDEORESIZE:
                     # screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                     Display.resize(event, g.refresh_resolution) if g is not None else None
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pass
-                if event.type == pygame.KEYDOWN:
+                if event.type == pygame.KEYUP:
                     if event.key == pygame.K_RETURN:
-                        self.controls[self.cur_input_field].end_input()
-                        if self.cur_input_field == 0 and self.user_choices is not None:
-                            self.user_choices.hide()
-                        self.cur_input_field += 1
-                        if self.cur_input_field >= len(self.controls):
-                            self.wc_state = WelcomeState.INPUT_COMPLETE
-                            log(f"marking end of field entry(ies) {self.controls}")
+                        if self.messagebox is not None:
+                            self.messagebox.destroy(self.surface)
+                            self.messagebox = None
                             continue
-                        self.controls[self.cur_input_field].begin_input()
-                        # self.n = Network(self.name)
+
+                        c = self.controls[self.cur_input_field]
+                        if len(c.text.strip()) == 0:
+                            msg = " " + c.p_text + " cannot be empty"
+                            self.messagebox = MessageBox(self.surface.get_width(), self.surface.get_height(),
+                                                         20, 5,
+                                                         msg,
+                                                         "ok", blink=True)
+                            self.messagebox.show()
+                            continue
+                        self.move_next_control(event)
                     else:
+                        if self.cur_input_field == 0 and \
+                                self.user_choices is not None and \
+                                self.user_choices.key_up(event):
+                            continue
+
+                        mod = event.mod == pygame.KMOD_NONE
+                        if mod and (event.key == pygame.K_DOWN or event.key == pygame.K_TAB) \
+                                and 0 <= self.cur_input_field < len(self.controls):
+                            self.move_next_control(event)
+                            continue
+                        elif (
+                                     mod and event.key == pygame.K_UP
+                                     or
+                                     (
+                                             event.mod & pygame.KMOD_SHIFT and event.key == pygame.K_TAB
+                                     )
+                             ) and 0 <= self.cur_input_field < len(self.controls):
+                            self.move_next_control(event, True)
+
                         # gets the key name
                         key_name = pygame.key.name(event.key)
                         # converts to uppercase the key name
                         key_name = key_name.lower()
                         self.controls[self.cur_input_field].type(key_name)
 
+            # self.surface.fill(self.BG)
+            pygame_widgets.update(events)  # Call once every loop to allow widgets to render and listen
+            self.draw()
+
         self.save_gamesettings()
 
     def save_gamesettings(self):
         with open(CLIENT_SETTINGS_FILE, 'w') as fp:
             yaml.safe_dump(self.game_settings, fp)
+
+    def move_next_control(self, event: Event, reverse=False):
+        self.controls[self.cur_input_field].end_input()
+
+        if self.cur_input_field == len(self.controls) - 1 and event.key == pygame.K_RETURN:
+            self.login()
+            return
+
+        if not reverse and self.cur_input_field < len(self.controls)-1:
+            if self.cur_input_field == 0 and self.user_choices is not None:
+                self.user_choices.hide()
+            self.cur_input_field += 1
+        elif reverse and self.cur_input_field > 0:
+            self.cur_input_field -= 1
+            if self.cur_input_field == 0 and self.user_choices is not None:
+                self.user_choices.show()
+        else:
+            return
+        self.controls[self.cur_input_field].begin_input()
 
 
 def main():

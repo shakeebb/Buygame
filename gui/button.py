@@ -3,6 +3,7 @@ Stores interface for button and two concrete button classes
 to be used in the UI.
 """
 import pygame
+from pygame.event import Event
 
 from gui.display import Display
 from common.gameconstants import *
@@ -11,14 +12,16 @@ from common.gameconstants import *
 class Button(Display):
 
     def __init__(self, h_margin_cells, v_margin_cells, width_cells, height_cells, on_display=True,
+                 visual_effects=False,
                  fill_color: Colors = Colors.LTR_GRAY,
-                 border_color: Colors = Colors.BLACK, bg_color: Colors = Colors.WHITE):
+                 border_color: Colors = Colors.LTS_GRAY, bg_color: Colors = Colors.WHITE):
         super().__init__(h_margin_cells, v_margin_cells, width_cells, height_cells)
-    # def __init__(self, x, y, width, height, color, border_color=(0, 0, 0)):
-    #     self.x = x
-    #     self.y = y
-    #     self.height = height
-    #     self.width = width
+        # def __init__(self, x, y, width, height, color, border_color=(0, 0, 0)):
+        #     self.x = x
+        #     self.y = y
+        #     self.height = height
+        #     self.width = width
+        self._mouse_down = False
         self.bg_color = bg_color
         self.display_color = fill_color
         self.fill_color = fill_color
@@ -27,6 +30,7 @@ class Button(Display):
         self.on_display = on_display
         self.cleared = False
         self.enabled = True
+        self.effects = visual_effects
 
     def refresh_dims(self):
         pass
@@ -40,6 +44,7 @@ class Button(Display):
         return self.fill_color
 
     def draw(self, win):
+        render_shadow = self.effects
         if self.on_display:
             bc = self.border_color.value
             fc = self.fill_color.value
@@ -47,10 +52,34 @@ class Button(Display):
             self.cleared = True
             bc = self.bg_color.value
             fc = self.bg_color.value
+            # if not on display, border color will clear
+            render_shadow = False
         else:
             return
-        pygame.draw.rect(win, fc, (self.x, self.y, self.width, self.height), 0)
-        pygame.draw.rect(win, bc, (self.x, self.y, self.width, self.height), 1)
+
+        off = BTN_SH_OFFSET
+        pygame.draw.rect(win, fc, (self.x+off, self.y+off, self.width-(2*off), self.height-(2*off)),
+                         0,
+                         BTN_CORNER_RAD)
+        if render_shadow and self._mouse_down:
+            pygame.draw.rect(win, Colors.GRAY.value, (self.x, self.y, self.width, self.height),
+                             off,
+                             BTN_CORNER_RAD + off)
+            pygame.draw.rect(win, Colors.LTR_GRAY.value, (self.x, self.y, self.width, self.height),
+                             2,
+                             BTN_CORNER_RAD + off)
+        elif render_shadow:
+            pygame.draw.rect(win, Colors.LTS_GRAY.value, (self.x, self.y, self.width, self.height),
+                             off,
+                             BTN_CORNER_RAD + off)
+        else:
+            pygame.draw.rect(win, bc, (self.x, self.y, self.width, self.height),
+                             off,
+                             BTN_CORNER_RAD + off)
+
+        pygame.draw.rect(win, fc, (self.x+off, self.y+off, self.width-(2*off), self.height-(2*off)),
+                         0,
+                         BTN_CORNER_RAD)
 
     def click(self, x, y):
         """
@@ -83,10 +112,20 @@ class Button(Display):
         self.fill_color = Colors.LTR_GRAY
         self.enabled = False
 
+    def mouse_down(self):
+        self._mouse_down = True
+
+    def mouse_up(self):
+        self._mouse_down = False
+
 
 class TextButton(Button):
-    def __init__(self, x, y, width, height, fill_color: Colors, text, border_color: Colors = Colors.BLACK):
-        super().__init__(x, y, width, height, fill_color=fill_color, border_color=border_color)
+    def __init__(self, x, y, width, height,
+                 fill_color: Colors, text,
+                 visual_effects=False,
+                 border_color: Colors = Colors.LTS_GRAY):
+        super().__init__(x, y, width, height, visual_effects=visual_effects,
+                         fill_color=fill_color, border_color=border_color)
         self.text = text
         self.render_txt = self.text
         self.text_font = pygame.font.SysFont("comicsans", 30)
@@ -132,14 +171,14 @@ class RadioButton(Button):
                  text_offset=(28, 1),
                  fill_color: Colors = Colors.LTR_GRAY,
                  font_color: Colors = Colors.BLACK,
-                 border_color: Colors = Colors.BLACK,
+                 border_color: Colors = Colors.LTS_GRAY,
                  check_color: Colors = Colors.BLACK):
         super().__init__(x, y, width, height, fill_color=fill_color, border_color=border_color)
 
-    # def __init__(self, x, y, color=(230, 230, 230),
-    #              outline_color=(0, 0, 0), check_color=(0, 0, 0),
-    #              font_size=22, font_color=(0, 0, 0),
-    #              text_offset=(28, 1), font='comicsans'):
+        # def __init__(self, x, y, color=(230, 230, 230),
+        #              outline_color=(0, 0, 0), check_color=(0, 0, 0),
+        #              font_size=22, font_color=(0, 0, 0),
+        #              text_offset=(28, 1), font='comicsans'):
         self.fill_color = fill_color
         self.border_color = border_color
         self.check_color = check_color
@@ -154,8 +193,8 @@ class RadioButton(Button):
     class Option:
         def __init__(self, radio, x, y, idnum, caption=""):
             self.rb: RadioButton = radio
-            self.x = x + (INIT_TILE_SIZE/(4*TILE_ADJ_MULTIPLIER))
-            self.y = y + (idnum * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE) + (INIT_TILE_SIZE/(4*TILE_ADJ_MULTIPLIER))
+            self.x = x + (INIT_TILE_SIZE / (4 * TILE_ADJ_MULTIPLIER))
+            self.y = y + ((idnum+.2) * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE) + (INIT_TILE_SIZE / (4 * TILE_ADJ_MULTIPLIER))
             self.caption = caption
             self.checked = False
             self.checkbox_obj = pygame.Rect(self.x, self.y,
@@ -180,7 +219,8 @@ class RadioButton(Button):
             self._draw_button_text(surface)
 
         def _draw_button_text(self, surface):
-            self.font_surf = self.rb.text_font.render(self.caption, True, self.rb.font_color.value)
+            self.font_surf = self.rb.text_font.render(self.caption,
+                                                      True, self.rb.font_color.value)
             w, h = self.rb.text_font.size(self.caption)
             self.font_pos = (self.x + self.rb.to[0], self.y + 12 / 2 - h / 2 +
                              self.rb.to[1])
@@ -198,14 +238,11 @@ class RadioButton(Button):
             y_ur = py + h
             # print(f"{px} {py} {cw} {ch} {w} {h} -- {x_ur} -- {x} -- {y_lr} {y_ur} {y}")
             if px < x < x_ur and y_lr < y < y_ur:
-                if not self.checked:
-                    self.mark_checked()
                 return True
             return False
 
         def mark_checked(self):
             self.checked = True
-            self.rb.last_chosen_option = self
 
         def mark_unchecked(self):
             self.checked = False
@@ -217,39 +254,68 @@ class RadioButton(Button):
         for o in self.options:
             o.render(surface)
 
+    def key_up(self, event: Event):
+        mod = event.mod == pygame.KMOD_NONE
+        if mod and (event.key == pygame.K_DOWN or event.key == pygame.K_TAB) \
+                and \
+                self.last_chosen_option.idnum != len(self.options) - 1:
+            nxt = self.options[self.last_chosen_option.idnum + 1]
+            self.handle_option_sel(nxt)
+            return True
+        elif (
+                mod and event.key == pygame.K_UP
+                or
+                (
+                        event.mod & pygame.KMOD_SHIFT and event.key == pygame.K_TAB
+                )
+        ) and \
+                self.last_chosen_option.idnum != 0:
+            prev = self.options[self.last_chosen_option.idnum - 1]
+            self.handle_option_sel(prev)
+            return True
+        return False
+
     def click(self, x, y):
         if not self.on_display:
             return
         # if event_object.type == pygame.MOUSEBUTTONDOWN:
         for o in self.options:
             if o.click(x, y):
-                for de_sel in self.options:
-                    de_sel.mark_unchecked() if de_sel.idnum != o.idnum else None
-                self.last_chosen_option = o
-                if self.on_option_click is not None:
-                    self.on_option_click(o)
+                self.handle_option_sel(o)
                 break
+
+    def handle_option_sel(self, o: Option):
+        if self.last_chosen_option is not None:
+            self.last_chosen_option.mark_unchecked()
+        # for de_sel in self.options:
+        #     de_sel.mark_unchecked() if de_sel.idnum != o.idnum else None
+        o.mark_checked()
+        self.last_chosen_option = o
+        if self.on_option_click is not None:
+            self.on_option_click(o)
 
     def add_option(self, txt):
         self.options.append(RadioButton.Option(self, self.x, self.y, caption=txt,
                                                idnum=len(self.options)))
         self.options[0].mark_checked()
 
+    def reset(self):
+        for o in self.options:
+            o.mark_unchecked()
+
     def show(self):
         if self.on_display:
             # already on display
             return
         self.on_display = True
-        for o in self.options:
-            o.mark_unchecked()
-        self.options[0].mark_checked()
+        self.handle_option_sel(self.options[0])
 
     def hide(self):
         if not self.on_display:
             # already on no-display
             return
         self.on_display = False
-        self.last_chosen_option = None
+        # self.last_chosen_option = None
 
     def get_chosen_option_value(self) -> int:
         return self.last_chosen_option.idnum if self.last_chosen_option is not None else -1
@@ -283,7 +349,6 @@ class MessageBox(pygame.sprite.Sprite):
                 continue
         # add the residual last line
         _msgs.append(self.font.render(oneliner, True, self.f_color.value))
-
         self.msgs = _msgs
         self.in_display = in_display
         self.w = (width * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE)
@@ -292,20 +357,22 @@ class MessageBox(pygame.sprite.Sprite):
         self.y = (parent_height - self.h) // 2
         self.fc = Colors.WHITE
         self.bc = Colors.NAVY_BLUE
+        self.clear_field = pygame.Surface((self.w, self.h))
 
         r_m = self.msgs[0]
-        self.l_x = self.x + (self.w - r_m.get_width())/2
-        self.l_y = self.y + ((self.h - r_m.get_height()) * 1/4)
+        self.l_x = self.x + (self.w - r_m.get_width()) / 2
+        self.l_y = self.y + ((self.h - r_m.get_height()) * 1 / 4)
 
         t_w = 3 * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE
         t_h = 1 * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE
-        mid_x = self.x + (self.w - t_w)/2
-        bottom_y = self.y + ((self.h - t_h)*3/4)
-        self.ok_button = TextButton(mid_x//INIT_TILE_SIZE,
-                                    bottom_y//INIT_TILE_SIZE,
-                                    t_w//INIT_TILE_SIZE, t_h//INIT_TILE_SIZE,
+        mid_x = self.x + (self.w - t_w) / 2
+        bottom_y = self.y + ((self.h - t_h) * 3 / 4)
+        self.ok_button = TextButton(mid_x // INIT_TILE_SIZE,
+                                    bottom_y // INIT_TILE_SIZE,
+                                    t_w // INIT_TILE_SIZE, t_h // INIT_TILE_SIZE,
                                     Colors.YELLOW, ok_text,
-                                    Colors.YELLOW)
+                                    visual_effects=False,
+                                    border_color=Colors.YELLOW)
         self.on_ok = on_ok
         self.blink = blink
         self.blink_fps = FPS if blink else -1
@@ -313,8 +380,10 @@ class MessageBox(pygame.sprite.Sprite):
     def show(self):
         self.in_display = True
 
-    def destroy(self):
+    def destroy(self, win):
         self.in_display = False
+        self.clear_field.fill(BG_COLOR.value)
+        win.blit(self.clear_field, (self.x, self.y))
         if self.on_ok is not None:
             self.on_ok()
 
@@ -333,15 +402,16 @@ class MessageBox(pygame.sprite.Sprite):
         pygame.draw.rect(win, self.bc.value, (self.x, self.y, self.w, self.h), 1)
         draw = True
         if self.blink:
-            if FPS < self.blink_fps <= 2*FPS:
+            if FPS < self.blink_fps <= 1.4 * FPS:
                 draw = False
-                self.blink_fps += -2*FPS if self.blink_fps == 2*FPS else 1
+                self.blink_fps += -1.3 * FPS if self.blink_fps >= 1.3 * FPS else 1
             else:
                 self.blink_fps += 1
 
         if draw:
             for i, s in enumerate(self.msgs):
                 win.blit(s, (self.l_x, self.l_y + (i * 10 * TILE_ADJ_MULTIPLIER)))
+
         self.ok_button.draw(win)
 
 
@@ -349,11 +419,15 @@ class InputText:
     def __init__(self, x: int, y: int, prompt,
                  default: str,
                  in_focus: bool = False,
-                 max_length = MAX_NAME_LENGTH):
-        self.prompt = prompt
+                 max_length=MAX_NAME_LENGTH):
+        self.p_text = prompt
+        self.prompt = Display.name(prompt)
+        self.p_len = len(prompt)
         self.text = default
         self.in_focus = in_focus
         self.max_length = max_length
+        f = Display.name(' '.join([' ' for _ in range(self.max_length)]))
+        self.clear_field = pygame.Surface((f.get_width(), f.get_height()))
         self.x = x
         self.y = y
 
@@ -385,14 +459,21 @@ class InputText:
         # self.settings[self.field] = self.text
 
     def draw(self, win: pygame.Surface):
-        n = Display.name(self.prompt + self.text)
+        n = Display.name(self.text)
+        pr = self.prompt.get_rect()
+        _x, _y = (self.x + pr.width, self.y + pr.height + 10)
         if self.in_focus:
-            txt_f = Display.name(self.prompt)
-            _x, _y = (self.x + txt_f.get_width(), self.y + n.get_height())
             pygame.draw.line(win, Colors.BLACK.value,
                              (_x, _y),
-                             (_x + n.get_width() - txt_f.get_width(), _y),
+                             (_x + n.get_width(), _y),
                              3)
-        win.blit(n, (self.x, self.y))
+        else:
+            pygame.draw.line(win, BG_COLOR.value,
+                             (_x, _y),
+                             (_x + self.clear_field.get_width(), _y),
+                             3)
 
-
+        self.clear_field.fill(BG_COLOR.value)
+        win.blit(self.clear_field, (self.x + pr.width, self.y))
+        win.blit(n, (self.x + pr.width, self.y))
+        win.blit(self.prompt, (self.x, self.y))

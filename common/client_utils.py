@@ -1,4 +1,6 @@
-from common.game import Game, Player, Tile, Txn
+from common.game import Game, Txn
+from common.tile import Tile
+from common.player import Player
 import time
 from common.gameconstants import ClientMsgReq, GameUIStatus, Colors, ClientResp
 from common.logger import log

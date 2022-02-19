@@ -121,7 +121,7 @@ class Display(pygame.sprite.Sprite):
         # cls.__i.window.blit(frame, frame.get_rect())
         # cls.__i.window.blit(cls.__i.surface, Display.dims())
         cls.__i.window.blit(pygame.transform.scale(cls.__i.surface, (cls.__i.win_w, cls.__i.win_h)), (0, 0))
-        pygame.display.flip()
+        pygame.display.update()
 
     @classmethod
     def resize(cls, event: Event, post_rsz: lambda w, h: None):

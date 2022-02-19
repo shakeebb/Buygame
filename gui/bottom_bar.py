@@ -18,7 +18,7 @@ class BottomBar(Display):
         # self.WIDTH = 660 / 800 * w
         # self.HEIGHT = 125 / 600 * h
         self.BORDER_THICKNESS = 5
-        from gui.base import GameUI
+        from gui.gameui import GameUI
         self.game: GameUI = game
         button_features = (5 * TILE_ADJ_MULTIPLIER, 1.5 * TILE_ADJ_MULTIPLIER, Colors.GREEN)
         # self.backtome = TextButton(h_margin_cells + 1,
@@ -34,15 +34,18 @@ class BottomBar(Display):
 
         self.action_button = TextButton(self.h_margin_cells + button_h_pos,
                                         button_v_pos,
-                                        *button_features, controls[0][0])
+                                        *button_features, controls[0][0],
+                                        visual_effects=True)
 
         self.discard_button = TextButton(self.h_margin_cells + (button_h_pos * 1.6),
                                          button_v_pos,
-                                         *button_features, controls[1][0])
+                                         *button_features, controls[1][0],
+                                         visual_effects=True)
 
         self.end_turn_button = TextButton(self.h_margin_cells + (button_h_pos * 2.2),
                                           button_v_pos,
-                                          *button_features, controls[2][0])
+                                          *button_features, controls[2][0],
+                                          visual_effects=True)
 
         self.option_button = RadioButton(self.h_margin_cells + (button_h_pos * 1.6),
                                          button_v_pos - 1.5,
@@ -95,12 +98,24 @@ class BottomBar(Display):
         # self.chatbutton.draw(win)
         self.dice.draw() if self.dice else None
 
-    def button_events(self):
+    def foreach_controls(self, action, condition=None):
+        for control in [self.action_button, self.discard_button, self.end_turn_button]:
+            if condition is None or condition(control):
+                action(control)
+
+    def mouse_down(self):
+        mouse = pygame.mouse.get_pos()
+        self.foreach_controls(lambda c: c.mouse_down(),
+                              lambda c: c.click(*mouse))
+
+    def mouse_up(self):
         """
         handle all button press events here
         :return: None
         """
         mouse = pygame.mouse.get_pos()
+        self.foreach_controls(lambda c: c.mouse_up())
+
         if self.option_button.on_display:
             self.option_button.click(*mouse)
             if self.action_button.click(*mouse):

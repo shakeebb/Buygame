@@ -5,8 +5,6 @@ Created on Fri Mar 26 13:40:58 2021
 @author: Boss
 """
 import datetime
-import pickle
-import random
 import signal
 import socket
 import os
@@ -14,6 +12,7 @@ import os
 import threading
 import time
 from _thread import *
+from collections import deque
 from threading import Event
 
 import pandas as pd
@@ -25,9 +24,11 @@ import yaml
 
 from common.game import *
 from common.gameconstants import *
+from common.gameconstants import GameStage
 from common.logger import log
 from datetime import datetime
 
+from common.player import Player
 from common.utils import serialize, receive_message, ObjectType, write_file
 from server.server_utils import SignalHandler
 from server.socket import ClientSocket
@@ -213,18 +214,42 @@ class Server:
     def cleanup_thread(self):
         while not self.cleanup_interval.is_set():
             curr_ts = datetime.now()
+
+            # handle stale client socket
             i = len(self.client_sockets_list) - 1
             while i >= 0:
                 log(f"i = {i} and cslist = {len(self.client_sockets_list)}") if VERBOSE else None
                 _cs = self.client_sockets_list[i]
                 # if we miss 5 heartbeats in a row, time to close that socket
                 x = (curr_ts - _cs.last_hb_received).total_seconds()
-                y = (HEARTBEAT_INTERVAL_SECS * 2.0)
+                y = (HEARTBEAT_INTERVAL_SECS * 5.0)
                 if x > y:
-                    log(f"Cleaning up player {_cs} socket")
+                    log(f"Cleaning up player {_cs} socket, last hb received @{_cs.last_hb_received}")
                     stale = self.client_sockets_list.pop(i)
                     stale.mark_inactive()
                 i -= 1
+
+            # handle stale game objects
+            with self.handshake_lock:
+                i = len(self.games) - 1
+                while i >= 0:
+                    _g: Game = self.games[i]
+                    # if the game is paused for too long (15 mins default)
+                    x = (curr_ts - _g.last_activity_time).total_seconds()
+                    if _g.game_status == GameStatus.PAUSED and x > _g.max_idle_secs:
+                        # timedelta(0,_g.max_idle_secs).__str__()
+                        log(f"Cleaning up game {_g} after {_g.max_idle_secs/60:.02f} min(s),"
+                            f"last_activity @{_g.last_activity_time}")
+                        stale = self.games.pop(i)
+                        with stale.game_mutex:
+                            stale.abandon_game()
+                    elif _g.game_status == GameStatus.COMPLETED:
+                        complete = self.games.pop(i)
+                        with complete.game_mutex:
+                            complete.close()
+
+                    i -= 1
+
             self.cleanup_interval.wait(HEARTBEAT_INTERVAL_SECS)
 
     def handle_client_msg(self, _cs: ClientSocket, decoded_p: int,
@@ -236,6 +261,7 @@ class Server:
         (msg_enum, data) = payload.split(':')
         log(f"client request: {msg_enum} - {data}") if msg_enum not in ClientMsgReq.HeartBeat.msg else None
         client_req: ClientMsgReq = ClientMsgReq.parse_msg_string(msg_enum + ':')
+        game.set_last_activity_ts()
 
         try:
             if ClientMsgReq.HeartBeat == client_req:
@@ -321,7 +347,7 @@ class Server:
 
     def handshake(self, cs: ClientSocket):
         retries = MAX_RETRY
-        while True:
+        while self.is_server_active:
             payload = receive_message(cs.socket, True)
             if not bool(payload):
                 if retries > 0:
@@ -357,7 +383,8 @@ class Server:
 
             g = None
             for _g in self.games:
-                if _g.game_id == game_id and _g.begin_time == begin_time:
+                if _g.game_status.value < GameStatus.ABANDONED.value and \
+                        _g.game_id == game_id and _g.begin_time == begin_time:
                     g = _g
                     break
 
@@ -365,7 +392,9 @@ class Server:
                 if len(self.games) == 0:
                     return None
 
-                open_games = list(filter(lambda _g: _g.game_state != GameState.END_SELL_ONLY and len(_g.players()) == 1,
+                open_games = list(filter(lambda _g: _g.game_status.value < GameStatus.ABANDONED.value
+                                         and len(_g.players()) == 1
+                                         and _g.players()[0].name != player_name,
                                          self.games))
                 if len(open_games) > 0:
                     latest_g = open_games[0]

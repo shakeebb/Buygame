@@ -3,7 +3,8 @@ Top bar displaying information about round
 """
 import pygame
 
-from common.game import Game, Player, PlayerState
+from common.game import Game, PlayerState
+from common.player import Player
 from common.logger import log
 from gui.display import Display
 from common.gameconstants import *
@@ -22,14 +23,15 @@ class TopBar(Display):
         self.time = 60
         self.drawing = False
         self.blink = False
-        from gui.base import GameUI
+        from gui.gameui import GameUI
         self.gameui: GameUI = None
         self.refresh_dims()
         self.connection_button = TextButton(self.xmargin() - 7,
                                             self.v_margin_cells + int(self.height_cells / 2) - 1,
                                             3*TILE_ADJ_MULTIPLIER, 2,
                                             Colors.YELLOW, "Init",
-                                            Colors.YELLOW)
+                                            visual_effects=False,
+                                            border_color=Colors.YELLOW)
         self.connection_button.change_font_size(15)
         self.client_msgs = MessageList(self.h_margin_cells + (width_cells - 19*TILE_ADJ_MULTIPLIER),
                                        self.v_margin_cells + 0.5,
@@ -99,7 +101,10 @@ class TopBar(Display):
         if VERBOSE:
             log("TopBar ht = %s, y = %s" % (self.height, self.y))
 
-    def button_events(self):
+    def mouse_down(self):
+        pass
+
+    def mouse_up(self):
         """
         handle all button press events here
         :return: None
@@ -152,7 +157,7 @@ class TopBar(Display):
         self.__set_connection_status(color)
 
     def __set_connection_status(self, s: Colors):
-        self.connection_button.set_color(s)
+        self.connection_button.set_color(s, set_border=True)
         if s is Colors.YELLOW:
             self.connection_button.set_text("Wait")
             self.connection_button.set_blink(True)
@@ -165,3 +170,4 @@ class TopBar(Display):
         elif s is Colors.RED:
             self.connection_button.set_text("ReConnect")
             self.connection_button.set_blink(True)
+
