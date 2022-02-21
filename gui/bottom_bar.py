@@ -25,7 +25,7 @@ class BottomBar(Display):
         #                            v_margin_cells + 1, *button_features, " Return ",
         #                            Colors.ORANGE)
         equal_parts = width_cells // 4
-        button_h_pos = equal_parts * 1.1
+        button_h_pos = equal_parts * 1.7
         button_v_pos = self.v_margin_cells - (5 * TILE_ADJ_MULTIPLIER)
         controls = [(" Roll ", -9, 1),
                     (" Discard ", -5 + 4, 1),
@@ -37,12 +37,12 @@ class BottomBar(Display):
                                         *button_features, controls[0][0],
                                         visual_effects=True)
 
-        self.discard_button = TextButton(self.h_margin_cells + (button_h_pos * 1.6),
+        self.discard_button = TextButton(self.h_margin_cells + (button_h_pos * 1.4),
                                          button_v_pos,
                                          *button_features, controls[1][0],
                                          visual_effects=True)
 
-        self.end_turn_button = TextButton(self.h_margin_cells + (button_h_pos * 2.2),
+        self.end_turn_button = TextButton(self.h_margin_cells + (button_h_pos * 1.8),
                                           button_v_pos,
                                           *button_features, controls[2][0],
                                           visual_effects=True)

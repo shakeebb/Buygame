@@ -36,9 +36,9 @@ class Leaderboard(Display):
         num_scores = len(scores)
         for i in range(LB_TOP_N):  # show only top 'n' scores
             if i % 2 == 0:
-                color = Colors.LT_GRAY.value
+                color = Colors.LTR_GRAY.value
             else:
-                color = Colors.GRAY.value
+                color = Colors.LTS_GRAY.value
             sec_h = int(self.height / LB_TOP_N)
             pygame.draw.rect(win, color, (self.x, self.y + i * sec_h, self.width, sec_h))
 

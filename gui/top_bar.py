@@ -18,7 +18,8 @@ class TopBar(Display):
         self.word = ""
         self.round = 1
         self.max_round = 15
-        self.round_font = pygame.font.SysFont("comicsans", 50)
+        self.player_font = pygame.font.SysFont("comicsans", 40)
+        self.round_font = pygame.font.SysFont("comicsans", 30)
         self.BORDER_THICKNESS = 5
         self.time = 60
         self.drawing = False
@@ -28,17 +29,17 @@ class TopBar(Display):
         self.refresh_dims()
         self.connection_button = TextButton(self.xmargin() - 7,
                                             self.v_margin_cells + int(self.height_cells / 2) - 1,
-                                            3*TILE_ADJ_MULTIPLIER, 2,
+                                            3 * TILE_ADJ_MULTIPLIER, 2,
                                             Colors.YELLOW, "Init",
                                             visual_effects=False,
                                             border_color=Colors.YELLOW)
         self.connection_button.change_font_size(15)
-        self.client_msgs = MessageList(self.h_margin_cells + (width_cells - 19*TILE_ADJ_MULTIPLIER),
+        self.client_msgs = MessageList(self.h_margin_cells + (width_cells - 19 * TILE_ADJ_MULTIPLIER),
                                        self.v_margin_cells + 0.5,
                                        12 * TILE_ADJ_MULTIPLIER,
                                        3 * TILE_ADJ_MULTIPLIER,
                                        5, 15)
-        adj = pygame.font.SysFont("timesnewroman", 14, italic=True).\
+        adj = pygame.font.SysFont("timesnewroman", 14, italic=True). \
             render("ABCDEFZ", True, (0, 0, 0)).get_height()
 
         # eq = (((self.ymargin() * INIT_TILE_SIZE) - adj * TILE_ADJ_MULTIPLIER)//INIT_TILE_SIZE)
@@ -51,10 +52,12 @@ class TopBar(Display):
         pygame.draw.rect(win, (0, 0, 0), (self.x, self.y, self.width, self.height), self.BORDER_THICKNESS)
 
         # draw round
-        txt = self.round_font.render(f"Player {self.gameui.player_name} "
-                                     f"Round {self.round}",
+        plyr_txt = self.player_font.render(f"Player {self.gameui.player_name} ",
+                                      True, Colors.BLACK.value)
+        rnd_txt = self.round_font.render(f"Round {self.round}",
                                      True, Colors.BLACK.value)
-        win.blit(txt, (self.x + 10, self.y + self.height / 2 - txt.get_height() / 2))
+        win.blit(plyr_txt, (self.x + 10, self.y + self.height / 4 - plyr_txt.get_height() / 4))
+        win.blit(rnd_txt, (self.x + 10, self.y + (self.height + plyr_txt.get_height()) / 2 - rnd_txt.get_height() / 2))
 
         # draw underscores
         # if self.drawing:
@@ -66,7 +69,7 @@ class TopBar(Display):
                  (self.x + self.width / 2 - txt.get_width() / 2, self.y + self.height / 2 - txt.get_height() / 2 + 10))
 
         self.server_msg.draw(win)
-        self.client_msgs.draw(win)
+        # self.client_msgs.draw(win)
         if self.gameui is not None:
             if self.gameui.network is not None and not self.gameui.network.is_connected:
                 self.__set_connection_status(Colors.RED)
@@ -170,4 +173,3 @@ class TopBar(Display):
         elif s is Colors.RED:
             self.connection_button.set_text("ReConnect")
             self.connection_button.set_blink(True)
-

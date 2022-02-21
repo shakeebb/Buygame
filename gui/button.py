@@ -387,11 +387,15 @@ class MessageBox(pygame.sprite.Sprite):
         if self.on_ok is not None:
             self.on_ok()
 
-    def button_events(self, x, y):
-        if self.ok_button.click(x, y):
+    def button_events(self, event: Event, x, y):
+        if event.type == pygame.MOUSEBUTTONUP and self.ok_button.click(x, y):
+            self.ok_button.mouse_up()
             self.in_display = False
             if self.on_ok is not None:
                 self.on_ok()
+            return True
+        elif event.type == pygame.MOUSEBUTTONDOWN and self.ok_button.click(x, y):
+            self.ok_button.mouse_down()
             return True
 
         return False

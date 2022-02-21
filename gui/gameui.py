@@ -54,7 +54,7 @@ class GameUI:
 
         self.leaderboard = Leaderboard(0.5,
                                        self.top_bar.ymargin() + (1 * TILE_ADJ_MULTIPLIER),
-                                       width_cells=h_percent(5 * TILE_ADJ_MULTIPLIER),
+                                       width_cells=h_percent(10 * TILE_ADJ_MULTIPLIER),
                                        height_cells=10 * TILE_ADJ_MULTIPLIER)
 
         self.message_box = MessageList(Display.num_horiz_cells() - h_percent(10 * TILE_ADJ_MULTIPLIER),
@@ -327,9 +327,9 @@ class GameUI:
                 if len(self.alert_boxes) > 0:
                     if event.type == KEYUP and event.key == K_ESCAPE:
                         self.alert_boxes[0].destroy(self.surface)
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        self.alert_boxes[0].button_events(*pygame.mouse.get_pos())
-                    continue
+                        continue
+                    if self.alert_boxes[0].button_events(event, *pygame.mouse.get_pos()):
+                        continue
 
                 if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
                     self.quit()
