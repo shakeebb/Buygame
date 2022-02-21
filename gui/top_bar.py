@@ -68,7 +68,7 @@ class TopBar(Display):
         self.server_msg.draw(win)
         self.client_msgs.draw(win)
         if self.gameui is not None:
-            if not self.gameui.network.is_connected:
+            if self.gameui.network is not None and not self.gameui.network.is_connected:
                 self.__set_connection_status(Colors.RED)
                 # self.button = pygame.draw.rect(win, self.color, self.start_button_pos, 0)
         self.connection_button.draw(win)

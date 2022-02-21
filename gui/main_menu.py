@@ -24,8 +24,14 @@ class MainMenu:
     def __init__(self, user_reset: bool, restore_from_default: bool):
         # self.name = ""
         self.wc_state = WelcomeState.INIT
-        Display.init()
-        self.surface = Display.surface()
+        # Display.init()
+        # self.surface = Display.surface()
+        self.scr_w, self.scr_h = Display.dims()
+        self.x, self.y = self.scr_w // 6, self.scr_h // 6
+        self.surface = pygame.Surface(
+            (self.scr_w//1.5, self.scr_h//1.5)
+        )
+
         self.controls: [InputText] = []
         self.user_choices: Optional[RadioButton] = None
         self.cur_input_field = 0
@@ -62,14 +68,15 @@ class MainMenu:
 
     def create_screen_layout(self):
         def_usr = ""
+        c_x, c_y = self.scr_w//10, INIT_TILE_SIZE * 1.5
         # if we have exactly one user, its safe to assume it.
         _users = self.game_settings['user_defaults'].keys()
         num_usrs = len(_users)
         if num_usrs == 1:
             def_usr = _users.__iter__().__next__()
         elif num_usrs > 1:
-            self.user_choices = RadioButton(800//INIT_TILE_SIZE,
-                                            300//INIT_TILE_SIZE,
+            self.user_choices = RadioButton(21 * TILE_ADJ_MULTIPLIER,
+                                            1 * TILE_ADJ_MULTIPLIER,
                                             MAX_NAME_LENGTH + 1,
                                             num_usrs * TILE_ADJ_MULTIPLIER,
                                             on_display=False,
@@ -80,16 +87,16 @@ class MainMenu:
                 def_usr = u if len(def_usr) == 0 else def_usr
             self.user_choices.show()
 
-        self.controls.append(InputText(200, 300,
+        self.controls.append(InputText(c_x, c_y,
                                        "Type a Name: ",
                                        def_usr,
                                        in_focus=True))
-        self.controls.append(InputText(200, 400,
+        self.controls.append(InputText(c_x, c_y * 5,
                                        "Connect to Server: ",
                                        self.game_settings['target_server_defaults']['ip'],
                                        max_length=16))
 
-        self.controls.append(InputText(200, 500,
+        self.controls.append(InputText(c_x, c_y * 10,
                                        "Connect to Server Port: ",
                                        self.game_settings['target_server_defaults']['port']))
 
@@ -97,20 +104,20 @@ class MainMenu:
             Button(
                 # Mandatory Parameters
                 self.surface,  # Surface to place button on
-                self.surface.get_width()/2-120,  # X-coordinate of top left corner
-                650,  # Y-coordinate of top left corner
-                120,  # Width
+                self.scr_w//4,  # X-coordinate of top left corner
+                self.scr_h//2,  # Y-coordinate of top left corner
+                100,  # Width
                 50,  # Height
 
                 # Optional Parameters
                 text='Login',  # Text to display
                 fontSize=22,  # Size of font
-                margin=20,  # Minimum distance between text/image and edge of button
+                margin=10,  # Minimum distance between text/image and edge of button
                 inactiveColour=Colors.LT_GRAY.value,  # Colour of button when not being interacted with
-                hoverColour=Colors.LTR_GRAY.value,  # Colour of button when being hovered over
+                hoverColour=Colors.GREEN.value,  # Colour of button when being hovered over
                 pressedColour=Colors.GRAY.value,  # Colour of button when being clicked
                 radius=15,  # Radius of border corners (leave empty for not curved)
-                onClick=self.login,  # Function to call when clicked on
+                onClick=lambda: self.login(),  # Function to call when clicked on
                 onClickParams=()
             )
         )
@@ -118,10 +125,9 @@ class MainMenu:
     def login(self):
         self.wc_state = WelcomeState.INPUT_COMPLETE
 
-    def draw(self):
-        display_width, display_height = Display.dims()
-        title = Display.title("Welcome to BuyGame !")
-        self.surface.blit(title, (display_width / 2 - title.get_width() / 2, 50))
+    def draw(self, input_game):
+        # title = Display.title("Welcome to BuyGame !")
+        # self.surface.blit(title, (display_width / 2 - title.get_width() / 2, 50))
         # name = Display.name("Type a Name: " + self.name)
         # self.surface.blit(name, (100, 400))
         for _c in self.controls:
@@ -129,15 +135,17 @@ class MainMenu:
         if self.user_choices is not None:
             self.user_choices.draw(self.surface)
 
-        if self.wc_state == WelcomeState.INPUT_COMPLETE:
-            enter = Display.enter_prompt("In Queue...")
-            self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
-        else:
-            enter = Display.enter_prompt("Press enter to join a game...")
-            self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
+        # if self.wc_state == WelcomeState.INPUT_COMPLETE:
+        #     enter = Display.enter_prompt("In Queue...")
+        #     self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
+        # else:
+        #     enter = Display.enter_prompt("Press enter to join a game...")
+        #     self.surface.blit(enter, (display_width / 2 - title.get_width() / 2, 800))
         if self.messagebox is not None:
             self.messagebox.draw(self.surface)
-        Display.show()
+
+        input_game.surface.blit(self.surface, (self.x, self.y))
+        pygame.display.update()
 
         if self.wc_state == WelcomeState.GAME_CONNECT:
             log("done display")
@@ -162,8 +170,10 @@ class MainMenu:
                     # for player in response:
                     # p = PlayerGUI(player)
                     # g.players.append(p)
+                    g.reinitialize()
                     g.handshake()
-                    g.main()
+                    return
+                    # g.main()
                 except (OSError, OverflowError) as e:
                     if self.messagebox is None:
                         if isinstance(e, OSError) and e.errno == 61:
@@ -258,9 +268,10 @@ class MainMenu:
                         key_name = key_name.lower()
                         self.controls[self.cur_input_field].type(key_name)
 
+            self.surface.fill(Colors.LTS_GRAY.value)
             # self.surface.fill(self.BG)
             pygame_widgets.update(events)  # Call once every loop to allow widgets to render and listen
-            self.draw()
+            self.draw(input_game)
 
         self.save_gamesettings()
 
@@ -288,43 +299,44 @@ class MainMenu:
         self.controls[self.cur_input_field].begin_input()
 
 
-def main():
-    _reset: bool = False
-    _restore: bool = False
-    user = server = ""
-    port = 0
-    import re
-    for i in range(len(sys.argv)):
-        if re.match("-ur|--user-reset", sys.argv[i].lower().strip()):
-            _reset = True
-        elif re.match("-rs|--restore", sys.argv[i].lower().strip()):
-            _restore = True
-        elif re.match("-u[\b]*|--user=", sys.argv[i].lower().strip()):
-            if sys.argv[i].strip() == "-u":
-                i += 1 if i < len(sys.argv) - 1 else 0
-                user = sys.argv[i]
-            else:
-                user = str(sys.argv[i]).split('=')[1]
-
-        elif re.match("-s[\b]*|--server=", sys.argv[i].lower().strip()):
-            if sys.argv[i].strip() == "-s":
-                i += 1 if i < len(sys.argv) - 1 else 0
-                server = sys.argv[i]
-            else:
-                server = str(sys.argv[i]).split('=')[1]
-        elif re.match("-p[\b]*|--port=", sys.argv[i].lower().strip()):
-            if sys.argv[i].strip() == "-p":
-                i += 1 if i < len(sys.argv) - 1 else 0
-                port = int(sys.argv[i])
-            else:
-                port = int(sys.argv[i]).split('=')[1]
-
-    _main = MainMenu(_reset, _restore)
-    _main.controls[0].set_text(user if len(user) > 0 else None)
-    _main.controls[1].set_text(server if len(server) > 0 else None)
-    _main.controls[2].set_text(port if port > 0 else None)
-    _main.run()
-
-
-if __name__ == "__main__":
-    main()
+# def main():
+#     _reset: bool = False
+#     _restore: bool = False
+#     user = server = ""
+#     port = 0
+#     import re
+#     for i in range(len(sys.argv)):
+#         if re.match("-ur|--user-reset", sys.argv[i].lower().strip()):
+#             _reset = True
+#         elif re.match("-rs|--restore", sys.argv[i].lower().strip()):
+#             _restore = True
+#         elif re.match("-u[\b]*|--user=", sys.argv[i].lower().strip()):
+#             if sys.argv[i].strip() == "-u":
+#                 i += 1 if i < len(sys.argv) - 1 else 0
+#                 user = sys.argv[i]
+#             else:
+#                 user = str(sys.argv[i]).split('=')[1]
+#
+#         elif re.match("-s[\b]*|--server=", sys.argv[i].lower().strip()):
+#             if sys.argv[i].strip() == "-s":
+#                 i += 1 if i < len(sys.argv) - 1 else 0
+#                 server = sys.argv[i]
+#             else:
+#                 server = str(sys.argv[i]).split('=')[1]
+#         elif re.match("-p[\b]*|--port=", sys.argv[i].lower().strip()):
+#             if sys.argv[i].strip() == "-p":
+#                 i += 1 if i < len(sys.argv) - 1 else 0
+#                 port = int(sys.argv[i])
+#             else:
+#                 port = int(sys.argv[i]).split('=')[1]
+#
+#     Display.init()
+#     _main = MainMenu(_reset, _restore)
+#     _main.controls[0].set_text(user if len(user) > 0 else None)
+#     _main.controls[1].set_text(server if len(server) > 0 else None)
+#     _main.controls[2].set_text(port if port > 0 else None)
+#     _main.run()
+#
+#
+# if __name__ == "__main__":
+#     main()

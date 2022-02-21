@@ -20,6 +20,8 @@ class GameTracker:
         self.gte = GameTrackerEntry()
 
     def track(self, g, p: Player, cb):
+        if self.tracker_file is None:
+            return
         from common.game import Game
         assert isinstance(g, Game)
         self.gte.update_game(g)
@@ -30,6 +32,7 @@ class GameTracker:
 
     def close(self):
         self.tracker_file.close()
+        self.tracker_file = None
 
 
 class GameTrackerEntry:

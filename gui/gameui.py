@@ -8,7 +8,7 @@ import pygame
 from pygame.surface import Surface
 
 import common
-from common import network
+from common import network, gameconstants
 from common.client_utils import ClientUtils
 from common.game import Game, Notification
 from common.gameconstants import *
@@ -30,26 +30,18 @@ from gui.uiobjects import UITile
 class GameUI:
     def __init__(self, main_menu: MainMenu):
         Display.init()
+        self.do_login = True
         self.main_menu = main_menu
-        self.target_server_settings = self.main_menu.game_settings['target_server_defaults']
-        usr_defs = self.main_menu.game_settings['user_defaults']
+        self.target_server_settings = None
+        self.player_name = ""
+        self.ip = ""
+        self.port = 0
+        self.socket_timeout = 0
 
-        self.player_name = self.main_menu.controls[0].text
-        input_ip = self.main_menu.controls[1].text
-        self.ip = input_ip if len(input_ip) > 0 else self.target_server_settings['ip']
-        input_port = self.main_menu.controls[2].text
-        self.port = int(input_port) if int(input_port) > 0 else int(self.target_server_settings['port'])
-        self.socket_timeout = int(self.target_server_settings['socket_timeout'])
-
-        if self.player_name not in dict(usr_defs):
-            usr_defs[self.player_name] = {}
-        self.user_settings = usr_defs[self.player_name]
+        self.user_settings = None
 
         self.my_player_number = -1
-        if 'session_id' in self.user_settings:
-            self.session_id = self.user_settings['session_id']
-        else:
-            self.session_id = ""
+        self.session_id = ""
 
         self.surface = Display.surface()
 
@@ -281,7 +273,41 @@ class GameUI:
             finally:
                 self.hb_event.wait(WAIT_POLL_INTERVAL)
 
+    def show_login_screen(self):
+        if not self.do_login:
+            return
+
+        gameconstants.DISPLAY_TILE_GRID = True
+        self.top_bar.gameui = self
+        self.draw()
+        self.main_menu.run(self)
+        self.do_login = False
+        gameconstants.DISPLAY_TILE_GRID = False
+
+    def reinitialize(self):
+        self.target_server_settings = self.main_menu.game_settings['target_server_defaults']
+        usr_defs = self.main_menu.game_settings['user_defaults']
+
+        self.player_name = self.main_menu.controls[0].text
+        input_ip = self.main_menu.controls[1].text
+        self.ip = input_ip if len(input_ip) > 0 else self.target_server_settings['ip']
+        input_port = self.main_menu.controls[2].text
+        self.port = int(input_port) if int(input_port) > 0 else int(self.target_server_settings['port'])
+        self.socket_timeout = int(self.target_server_settings['socket_timeout'])
+
+        if self.player_name not in dict(usr_defs):
+            usr_defs[self.player_name] = {}
+        self.user_settings = usr_defs[self.player_name]
+
+        self.my_player_number = -1
+        if 'session_id' in self.user_settings:
+            self.session_id = self.user_settings['session_id']
+        else:
+            self.session_id = ""
+
     def main(self):
+        self.show_login_screen()
+
         pygame.display.set_caption('beta version BuyGame')
         logger.reset()
 
@@ -291,6 +317,7 @@ class GameUI:
 
         pygame.event.clear()
         selected: Optional[UITile] = None
+
         self.hb_thread.start()
 
         while True:  # main game loop
