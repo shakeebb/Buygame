@@ -282,7 +282,7 @@ class Game:
             s_notify_t = NotificationType.ERR
             self.notify_all_players(p.number,
                                     s_m, o_m, self_notify_type=s_notify_t)
-            self.track(p, lambda gte: gte.update_msg(o_m))
+            self.track(p, lambda gte: gte.update_msg(s_m))
             return
 
         p.set_state(PlayerState.WAIT)

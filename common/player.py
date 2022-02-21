@@ -218,3 +218,4 @@ class Player:
             self.txn_status = Txn.TURN_COMPLETE
 
         self.game.player_try_turn_complete(self)
+
