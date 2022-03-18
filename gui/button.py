@@ -2,10 +2,13 @@
 Stores interface for button and two concrete button classes
 to be used in the UI.
 """
+import copy
+from typing import Optional
+
 import pygame
 from pygame.event import Event
 
-from gui.display import Display
+from gui.gui_common.display import Display
 from common.gameconstants import *
 
 
@@ -31,6 +34,10 @@ class Button(Display):
         self.cleared = False
         self.enabled = True
         self.effects = visual_effects
+        off = BTN_SH_OFFSET
+        self.border_rect = pygame.Rect(self.x+off, self.y+off, self.width-(2*off), self.height-(2*off))
+        self.mouse_event_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        self.button_rect = pygame.Rect(self.x+off, self.y+off, self.width-(2*off), self.height-(2*off))
 
     def refresh_dims(self):
         pass
@@ -58,26 +65,26 @@ class Button(Display):
             return
 
         off = BTN_SH_OFFSET
-        pygame.draw.rect(win, fc, (self.x+off, self.y+off, self.width-(2*off), self.height-(2*off)),
+        pygame.draw.rect(win, fc, self.border_rect,
                          0,
                          BTN_CORNER_RAD)
         if render_shadow and self._mouse_down:
-            pygame.draw.rect(win, Colors.GRAY.value, (self.x, self.y, self.width, self.height),
+            pygame.draw.rect(win, Colors.GRAY.value, self.mouse_event_rect,
                              off,
                              BTN_CORNER_RAD + off)
-            pygame.draw.rect(win, Colors.LTR_GRAY.value, (self.x, self.y, self.width, self.height),
+            pygame.draw.rect(win, Colors.LTR_GRAY.value, self.mouse_event_rect,
                              2,
                              BTN_CORNER_RAD + off)
         elif render_shadow:
-            pygame.draw.rect(win, Colors.LTS_GRAY.value, (self.x, self.y, self.width, self.height),
+            pygame.draw.rect(win, Colors.LTS_GRAY.value, self.mouse_event_rect,
                              off,
                              BTN_CORNER_RAD + off)
         else:
-            pygame.draw.rect(win, bc, (self.x, self.y, self.width, self.height),
+            pygame.draw.rect(win, bc, self.mouse_event_rect,
                              off,
                              BTN_CORNER_RAD + off)
 
-        pygame.draw.rect(win, fc, (self.x+off, self.y+off, self.width-(2*off), self.height-(2*off)),
+        pygame.draw.rect(win, fc, self.button_rect,
                          0,
                          BTN_CORNER_RAD)
 
@@ -169,6 +176,8 @@ class RadioButton(Button):
                  on_option_click=None,
                  on_display=True,
                  text_offset=(28, 1),
+                 option_offset=(.2, .2),
+                 horizontal=False,
                  fill_color: Colors = Colors.LTR_GRAY,
                  font_color: Colors = Colors.BLACK,
                  border_color: Colors = Colors.LTS_GRAY,
@@ -185,25 +194,35 @@ class RadioButton(Button):
         self.text_font = pygame.font.SysFont("comicsans", 22)
         self.font_color = font_color
         self.to = text_offset
+        self.oo = option_offset
         self.options: [RadioButton.Option] = []
         self.on_display = on_display
-        self.last_chosen_option: RadioButton.Option = None
+        self.last_chosen_option: Optional[RadioButton.Option] = None
         self.on_option_click = on_option_click
+        self.horizontal = horizontal
 
     class Option:
-        def __init__(self, radio, x, y, idnum, caption=""):
+        def __init__(self, radio, x, y, idnum, caption="", show_caption=True):
             self.rb: RadioButton = radio
-            self.x = x + (INIT_TILE_SIZE / (4 * TILE_ADJ_MULTIPLIER))
-            self.y = y + ((idnum+.2) * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE) + (INIT_TILE_SIZE / (4 * TILE_ADJ_MULTIPLIER))
+            if not self.rb.horizontal:
+                self.x = x + (INIT_TILE_SIZE / (4 * TILE_ADJ_MULTIPLIER))
+                self.y = y + ((idnum+self.rb.oo[0]) * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE) + \
+                             (INIT_TILE_SIZE / (4 * TILE_ADJ_MULTIPLIER))
+            else:
+                adj = self.rb.oo[0] if idnum == 0 else idnum * self.rb.oo[1]
+                self.x = x + (adj * TILE_ADJ_MULTIPLIER * INIT_TILE_SIZE) + \
+                             (INIT_TILE_SIZE / (4 * TILE_ADJ_MULTIPLIER))
+                self.y = y + (INIT_TILE_SIZE / (2 * TILE_ADJ_MULTIPLIER))
             self.caption = caption
+            self.show_caption = show_caption
             self.checked = False
             self.checkbox_obj = pygame.Rect(self.x, self.y,
                                             12,
                                             12)
-            self.checkbox_outline = self.checkbox_obj.copy()
+            # self.checkbox_outline = self.checkbox_obj.copy()
             self.idnum = idnum
 
-        def render(self, surface):
+        def draw(self, surface):
             offset = 6 * TILE_ADJ_MULTIPLIER
             if self.checked:
                 pygame.draw.circle(surface, self.rb.border_color.value, (self.x + offset, self.y + offset),
@@ -216,7 +235,8 @@ class RadioButton(Button):
                                    5)
                 pygame.draw.circle(surface, self.rb.fill_color.value, (self.x + offset, self.y + offset),
                                    4)
-            self._draw_button_text(surface)
+            if self.show_caption:
+                self._draw_button_text(surface)
 
         def _draw_button_text(self, surface):
             self.font_surf = self.rb.text_font.render(self.caption,
@@ -247,12 +267,17 @@ class RadioButton(Button):
         def mark_unchecked(self):
             self.checked = False
 
+    def make_copy(self, yoffset):
+        new_self = copy.deepcopy(self)
+        new_self.y += yoffset
+        return new_self
+
     def draw(self, surface):
         super().draw(surface)
         if not self.on_display:
             return
         for o in self.options:
-            o.render(surface)
+            o.draw(surface)
 
     def key_up(self, event: Event):
         mod = event.mod == pygame.KMOD_NONE
@@ -278,6 +303,10 @@ class RadioButton(Button):
     def click(self, x, y):
         if not self.on_display:
             return
+
+        if not self.border_rect.collidepoint(x, y):
+            return
+
         # if event_object.type == pygame.MOUSEBUTTONDOWN:
         for o in self.options:
             if o.click(x, y):
@@ -294,10 +323,13 @@ class RadioButton(Button):
         if self.on_option_click is not None:
             self.on_option_click(o)
 
-    def add_option(self, txt):
+    def add_option(self, txt, show_caption=True, default_sel=0):
         self.options.append(RadioButton.Option(self, self.x, self.y, caption=txt,
+                                               show_caption=show_caption,
                                                idnum=len(self.options)))
-        self.options[0].mark_checked()
+        if default_sel == (len(self.options) - 1):
+            self.last_chosen_option = self.options[default_sel]
+            self.last_chosen_option.mark_checked()
 
     def reset(self):
         for o in self.options:
@@ -481,3 +513,17 @@ class InputText:
         win.blit(self.clear_field, (self.x + pr.width, self.y))
         win.blit(n, (self.x + pr.width, self.y))
         win.blit(self.prompt, (self.x, self.y))
+
+
+class ProgressBar(Button):
+    def __init__(self, x, y, width, height,
+                 fill_color: Colors = Colors.LTR_GRAY,
+                 border_color: Colors = Colors.LTS_GRAY):
+        super().__init__(x, y, width, height, fill_color=fill_color, border_color=border_color)
+        xx = {}
+        # xx.__contains__()
+
+    def draw(self, win):
+        pygame.draw.rect(win, Colors.GREEN.value, (self.x, self.y, self.width, self.height), 4)
+        pass
+

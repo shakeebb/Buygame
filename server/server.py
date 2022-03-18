@@ -24,7 +24,6 @@ import yaml
 
 from common.game import *
 from common.gameconstants import *
-from common.gameconstants import GameStage
 from common.logger import log
 from datetime import datetime
 
@@ -258,7 +257,13 @@ class Server:
         # if _game_id in games:
         # current_game = game
         # if bool(payload) is not False:
-        (msg_enum, data) = payload.split(':')
+        import re
+        m = re.match('^(.*?):(.*?)$', payload, re.M)
+        if m is None:
+            (msg_enum, data) = payload.split(':')
+        else:
+            (msg_enum, data) = (m.group(1), m.group(2))
+
         log(f"client request: {msg_enum} - {data}") if msg_enum not in ClientMsgReq.HeartBeat.msg else None
         client_req: ClientMsgReq = ClientMsgReq.parse_msg_string(msg_enum + ':')
         game.set_last_activity_ts()
@@ -335,6 +340,11 @@ class Server:
                     game.set_server_message(f"{ClientResp.Must_Sell.msg} Player {decoded_p}")
                 elif _cs.player.txn_status == Txn.TURN_COMPLETE:
                     game.set_server_message(f"{ClientResp.Turn_Ended.msg} Player {decoded_p}")
+
+            elif ClientMsgReq.PostGameSurvey == client_req:
+                msg = data
+                _cs.player.player_post_game_survey(msg)
+                game.set_server_message(f"{ClientResp.PostGameSurveyDone.msg} Player {decoded_p}")
 
         finally:
             # self.games[_game_id] = current_game
@@ -445,6 +455,8 @@ class Server:
             g.set_server_message(f"{player.name} handshake complete")
             player.session_id = create_session_id()
             return g, player
+
+
 
 
 if __name__ == '__main__':

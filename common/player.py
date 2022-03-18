@@ -219,3 +219,7 @@ class Player:
 
         self.game.player_try_turn_complete(self)
 
+    def player_post_game_survey(self, msg):
+        gt = self.game.game_tracker
+        gt.gte.update_player(self)
+        gt.capture_post_game_survey(msg)

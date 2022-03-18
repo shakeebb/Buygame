@@ -6,8 +6,7 @@ import collections
 
 import pygame
 
-from common.logger import log
-from gui.display import Display
+from gui.gui_common.display import Display
 from common.gameconstants import *
 
 

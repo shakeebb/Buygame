@@ -5,9 +5,8 @@ import pygame
 
 import common.tile
 from common.logger import log
-from gui.display import Display
-from common.gameconstants import VERBOSE, Colors, SLOT_LAYER, INVENTORY_LAYER, TILE_LAYER, MOVING_TILE_LAYER, \
-    InventoryType
+from gui.gui_common.display import Display
+from common.gameconstants import VERBOSE, Colors, SLOT_LAYER, INVENTORY_LAYER, TILE_LAYER, InventoryType
 
 
 class Inventory(Display):
@@ -88,7 +87,6 @@ class Inventory(Display):
         self.border_color = border_color
         self.box_color = box_color
         self.tile_group = pygame.sprite.LayeredUpdates()
-        from gui import base
         # self.items: [[base.Tile]] = []
         # self.items: [[Tile]] = [[None for _ in range(cols)] for _ in range(rows)]
         self.slots_group = pygame.sprite.LayeredUpdates()

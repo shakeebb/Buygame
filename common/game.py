@@ -114,9 +114,15 @@ class Game:
                 return False
         return True
 
-    def set_roll(self):
+    def set_roll(self, p: Player):
         self.game_stage = GameStage.ROLL
         self.round += 1
+        # #SB:WARN:REMOVE
+        # if self.round > 2:
+        #     self.finish_game(p)
+        #     return
+        # #SB:WARN:REMOVE-ENDS
+
         if self.turn == len(self._players) - 1:
             self.turn = 0
         else:
@@ -293,20 +299,23 @@ class Game:
             return None
 
         if self.game_stage == GameStage.END_SELL_ONLY:
-            self.game_stage = GameStage.TERMINATE
-            self.game_status = GameStatus.COMPLETED
-            get_winner = self._players.copy()
-            get_winner.sort(key=lambda _p: _p.money, reverse=True)
-            m = f"{get_winner[0].name} is the winner!."
-            self.foreach_player(lambda _p: _p.set_notify(NotificationType.FLASH, m))
-            self.track(p, lambda gte: gte.update_msg(m, NotificationType.FLASH))
+            self.finish_game(p)
             return
 
         m = f"Round {self.round} complete."
         self.game_stage = GameStage.ROUND_COMPLETE
         self.foreach_player(lambda _p: _p.set_notify(NotificationType.ACT_2, m))
         self.track(p, lambda gte: gte.update_msg(m, NotificationType.ACT_2))
-        self.set_roll()
+        self.set_roll(p)
+
+    def finish_game(self, p: Player):
+        self.game_stage = GameStage.TERMINATE
+        self.game_status = GameStatus.COMPLETED
+        get_winner = self._players.copy()
+        get_winner.sort(key=lambda _p: _p.money, reverse=True)
+        m = f"{get_winner[0].name} is the winner!."
+        self.foreach_player(lambda _p: _p.set_notify(NotificationType.FLASH, m))
+        self.track(p, lambda gte: gte.update_msg(m, NotificationType.FLASH))
 
     def player_left(self, p: Player):
         n_msg = f"{p.name} left"
@@ -434,7 +443,7 @@ class Game:
         self.player_joined(player.number, player.team)
         # we need at least 2 players to start the game.
         if len(self._players) >= 2:
-            self.set_roll()
+            self.set_roll(player)
 
     def is_invalid_op(self, p: Player, err_msg: str):
         if self.game_stage == GameStage.END_SELL_ONLY and (

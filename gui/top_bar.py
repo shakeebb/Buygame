@@ -3,10 +3,9 @@ Top bar displaying information about round
 """
 import pygame
 
-from common.game import Game, PlayerState
 from common.player import Player
 from common.logger import log
-from gui.display import Display
+from gui.gui_common.display import Display
 from common.gameconstants import *
 from gui.button import TextButton
 from gui.label import Label, MessageList

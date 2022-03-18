@@ -3,7 +3,6 @@ import sys
 from threading import Thread, Event
 from typing import Optional
 
-import time
 import pygame
 from pygame.surface import Surface
 
@@ -18,11 +17,12 @@ from gui.base import SpriteSheet
 from gui.bottom_bar import BottomBar
 from gui.button import MessageBox
 from gui.chat import Chat
-from gui.display import Display
+from gui.gui_common.display import Display
 from gui.label import MessageList
 from gui.leaderboard import Leaderboard
 from gui.main_menu import MainMenu
 from gui.snap import Inventory
+from gui.survey.survey import Survey
 from gui.top_bar import TopBar
 from gui.uiobjects import UITile
 
@@ -122,8 +122,8 @@ class GameUI:
 
         self.top_bar.change_round(1)
         self.tileList = pygame.sprite.Group()
-        self.network: network.Network = None
-        self.__game: Game = None
+        self.network: Optional[network.Network] = None
+        self.__game: Optional[Game] = None
         path = os.path.dirname(__file__)
         self.tiles_sheet = SpriteSheet(os.path.join(path, "tiles", "all_tiles.png"))
         self.sprite_tiles: list[list[Surface]] = self.tiles_sheet.crop_out_sprites()
@@ -133,11 +133,13 @@ class GameUI:
         self.last_notification_received = 0
         self.current_round = -1
         self.alert_boxes = []
+        self.post_game_survey: Optional[Survey] = None
 
     def quit(self):
         self.main_menu.save_gamesettings()
         self.hb_event.set()
         self.hb_thread.join()
+        pygame.quit()
         sys.exit(0)
 
     def draw(self):
@@ -276,22 +278,23 @@ class GameUI:
     def show_login_screen(self):
         if not self.do_login:
             return
-
-        gameconstants.DISPLAY_TILE_GRID = True
-        self.top_bar.gameui = self
-        self.draw()
-        self.main_menu.run(self)
-        self.do_login = False
-        gameconstants.DISPLAY_TILE_GRID = False
+        try:
+            gameconstants.DISPLAY_TILE_GRID = True
+            self.top_bar.gameui = self
+            self.draw()
+            self.main_menu.run(self)
+            self.do_login = False
+        finally:
+            gameconstants.DISPLAY_TILE_GRID = False
 
     def reinitialize(self):
         self.target_server_settings = self.main_menu.game_settings['target_server_defaults']
         usr_defs = self.main_menu.game_settings['user_defaults']
 
         self.player_name = self.main_menu.controls[0].text
-        input_ip = self.main_menu.controls[1].text
+        input_ip = self.main_menu.get_ip()
         self.ip = input_ip if len(input_ip) > 0 else self.target_server_settings['ip']
-        input_port = self.main_menu.controls[2].text
+        input_port = self.main_menu.get_port()
         self.port = int(input_port) if int(input_port) > 0 else int(self.target_server_settings['port'])
         self.socket_timeout = int(self.target_server_settings['socket_timeout'])
 
@@ -460,6 +463,9 @@ class GameUI:
             # box.blit()
             # box.update()
             self.draw()
+            if self.post_game_survey is not None:
+                self.post_game_survey.main()
+                self.quit()
 
     def refresh_inventory(self, clear_inventory=False):
         try:
@@ -549,7 +555,8 @@ class GameUI:
 
         def handle_ok():
             if self.game().game_stage == GameStage.TERMINATE:
-                self.quit()
+                self.create_post_game_survey()
+                # self.quit()
             self.alert_boxes.pop(0)
 
         if color == Colors.RED or is_an_alert:
@@ -630,7 +637,7 @@ class GameUI:
             user_defs['player_id'] = self.my_player_number
             user_defs['name'] = self.player_name
             user_defs['session_id'] = new_session_id
-            self.target_server_settings['ip'] = self.main_menu.controls[1].text
+            self.target_server_settings['ip'] = self.main_menu.get_ip()
             self.main_menu.save_gamesettings()
 
             if game is None:
@@ -813,3 +820,14 @@ class GameUI:
             elif total <= 0:
                 self.bottom_bar.disable_action()
                 self.ui_game_status = GameUIStatus.SHOW_SELL
+
+    def create_post_game_survey(self):
+        gameconstants.DISPLAY_TILE_GRID = True
+        self.post_game_survey = Survey(self.submit_post_game_survey)
+        s = self.post_game_survey
+        s.add_post_game_survey_grid()
+        s.add_post_game_survey_inputs()
+
+    def submit_post_game_survey(self, msg):
+        ret_game = self.network.send(ClientMsgReq.PostGameSurvey.msg + msg)
+        self.set_game(ret_game)

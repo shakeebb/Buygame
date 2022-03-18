@@ -68,9 +68,10 @@ SERVER_SETTINGS_TEMPLATE = {
     }
 }
 
-FPS = 25  # frames per second, the general speed of the program
+FPS = 45  # frames per second, the general speed of the program
 MAX_RETRY = 5
 NL_DELIM = '\\\\'
+LINE_CONT = '\\--'
 # WINDOWWIDTH = 800 # size of window's width in pixels
 # WINDOWHEIGHT = 600 # size of windows' height in pixels
 
@@ -137,6 +138,7 @@ class ClientMsgReq(Enum):
     EndTurn = "end_turn:"
     Is_Done = "is_done:"
     Played = "played:"
+    PostGameSurvey = "post_game_survey:"
 
     def __init__(self, text: str):
         self.msg: str = text
@@ -162,6 +164,7 @@ class ClientResp(Enum):
     Not_Ready = "not_ready:"
     Cannot_Roll = "cannot_roll:"
     Cannot_Buy = "cannot_buy:"
+    PostGameSurveyDone = "post_game_survey_done:"
 
     def __init__(self, text: str):
         self.msg = text

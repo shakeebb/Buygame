@@ -1,20 +1,16 @@
 """
 Shows the main menu for the game, gets the user name before starting
 """
-import sys
 from typing import Optional
 
 import pygame
-import pygame_widgets
 from pygame.event import Event
-from pygame_widgets.button import Button
-from pygame_widgets.widget import WidgetBase
 
 from common.gameconstants import *
 from common.logger import log, logger
 from common.utils import write_file
 from gui.button import TextButton, MessageBox, InputText, RadioButton
-from gui.display import Display
+from gui.gui_common.display import Display
 import yaml
 
 
@@ -58,10 +54,12 @@ class MainMenu:
             except yaml.YAMLError as exc:
                 log("settings.yaml error ", exc)
                 pygame.quit()
+                quit()
         # self.widgets: [WidgetBase] = []
         self.login_button: Optional[TextButton] = None
         self.create_screen_layout()
         self.messagebox = None
+        self.server_endpoint = None
 
     def on_user_choice(self, o: RadioButton.Option):
         if len(self.controls) > 1:
@@ -86,42 +84,22 @@ class MainMenu:
             for u in _users:
                 self.user_choices.add_option(u)
                 def_usr = u if len(def_usr) == 0 else def_usr
-            self.user_choices.show()
+            # self.user_choices.show()
 
         self.controls.append(InputText(c_x, c_y,
                                        "Type a Name: ",
                                        def_usr,
                                        in_focus=True))
-        self.controls.append(InputText(c_x, c_y * 5,
-                                       "Connect to Server: ",
-                                       self.game_settings['target_server_defaults']['ip'],
-                                       max_length=16))
 
-        self.controls.append(InputText(c_x, c_y * 10,
-                                       "Connect to Server Port: ",
-                                       self.game_settings['target_server_defaults']['port']))
-
-        # self.widgets.append(
-        #     Button(
-        #         # Mandatory Parameters
-        #         self.surface,  # Surface to place button on
-        #         self.scr_w//4,  # X-coordinate of top left corner
-        #         self.scr_h//2,  # Y-coordinate of top left corner
-        #         100,  # Width
-        #         50,  # Height
+        # self.controls.append(InputText(c_x, c_y * 5,
+        #                                "Connect to Server: ",
+        #                                self.game_settings['target_server_defaults']['ip'],
+        #                                max_length=16))
         #
-        #         # Optional Parameters
-        #         text='Login',  # Text to display
-        #         fontSize=22,  # Size of font
-        #         margin=10,  # Minimum distance between text/image and edge of button
-        #         inactiveColour=Colors.LT_GRAY.value,  # Colour of button when not being interacted with
-        #         hoverColour=Colors.GREEN.value,  # Colour of button when being hovered over
-        #         pressedColour=Colors.GRAY.value,  # Colour of button when being clicked
-        #         radius=15,  # Radius of border corners (leave empty for not curved)
-        #         onClick=lambda: self.login(),  # Function to call when clicked on
-        #         onClickParams=()
-        #     )
-        # )
+        # self.controls.append(InputText(c_x, c_y * 10,
+        #                                "Connect to Server Port: ",
+        #                                self.game_settings['target_server_defaults']['port']))
+
         button_features = (5 * TILE_ADJ_MULTIPLIER, 1.5 * TILE_ADJ_MULTIPLIER, Colors.GREEN)
         self.login_button = TextButton((self.scr_w // 3.5) // INIT_TILE_SIZE,
                                        (self.scr_h // 2) // INIT_TILE_SIZE,
@@ -177,6 +155,8 @@ class MainMenu:
                     if g is None:
                         log("creating GameUI")
                         g = GameUI(self)
+                    if self.server_endpoint is None and len(self.controls) > 2:
+                        self.server_endpoint = self.controls[1].text + ":" + self.controls[2].text
                     # for player in response:
                     # p = PlayerGUI(player)
                     # g.players.append(p)
@@ -203,7 +183,8 @@ class MainMenu:
                         self.cur_input_field = 0
                         self.controls[self.cur_input_field].begin_input()
                         if self.user_choices is not None:
-                            self.user_choices.show()
+                            # self.user_choices.show()
+                            pass
                         self.wc_state = WelcomeState.USER_ERR_CONFIRM
                 finally:
                     g = input_game
@@ -226,8 +207,9 @@ class MainMenu:
 
                 elif event.type == pygame.MOUSEBUTTONUP:
                     mouse = pygame.mouse.get_pos()
+                    ss_mx, ss_my = map(lambda _c: _c[0] - _c[1], zip(mouse, self.surface.get_offset()))
                     if self.messagebox is not None and \
-                            self.messagebox.button_events(event, *mouse):
+                            self.messagebox.button_events(event, ss_mx, ss_my):
                         self.messagebox.destroy(self.surface)
                         self.messagebox = None
                         # self.wc_state = WelcomeState.QUIT
@@ -235,7 +217,6 @@ class MainMenu:
                         # pygame.quit()
                         continue  # modal dialog box.
 
-                    ss_mx, ss_my = map(lambda _c: _c[0] - _c[1], zip(mouse, self.surface.get_offset()))
                     if self.login_button is not None and \
                             self.login_button.click(ss_mx, ss_my):
                         self.login_button.mouse_up()
@@ -249,6 +230,7 @@ class MainMenu:
                 elif event.type == pygame.QUIT or \
                         (event.type == KEYUP and event.key == K_ESCAPE):
                     run = False
+                    pygame.quit()
                     quit()
 
                 elif event.type == VIDEORESIZE:
@@ -324,10 +306,41 @@ class MainMenu:
         elif reverse and self.cur_input_field > 0:
             self.cur_input_field -= 1
             if self.cur_input_field == 0 and self.user_choices is not None:
-                self.user_choices.show()
+                # self.user_choices.show()
+                pass
         else:
             return
         self.controls[self.cur_input_field].begin_input()
+
+    def discover_game_server(self):
+        import requests as reqs
+        from bs4 import BeautifulSoup
+        import re
+
+        response = reqs.get('http://soubhik.info/games')
+        page = BeautifulSoup(response.content, 'html.parser')
+        nested_page = page.find('iframe')['srcdoc']
+        buygame_section = BeautifulSoup(nested_page, 'html.parser')
+        buygame_url = list(map(lambda x: str(x).replace('\n', '').strip(),
+                               buygame_section.body.find('buygame')))[0]
+
+        pattern = re.compile('.*buygame-endpoint->\s*(.*)', re.M)
+        self.server_endpoint = pattern.match(buygame_url).group(1)
+        log(self.server_endpoint)
+
+    def get_ip(self):
+        if len(self.controls) > 1:
+            return self.controls[1].text
+        elif self.server_endpoint is not None:
+            server, _ = self.server_endpoint.split(':')
+            return server
+
+    def get_port(self):
+        if len(self.controls) > 2:
+            return self.controls[2].text
+        elif self.server_endpoint is not None:
+            _, port = self.server_endpoint.split(':')
+            return port
 
 # def main():
 #     _reset: bool = False

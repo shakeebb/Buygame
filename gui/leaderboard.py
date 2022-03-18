@@ -5,7 +5,7 @@ import pygame
 
 from common.player import Player
 from common.gameconstants import *
-from gui.display import Display
+from gui.gui_common.display import Display
 
 
 class Leaderboard(Display):

@@ -1,11 +1,11 @@
 import random
 
 import pygame
-import thorpy
+# import thorpy
 
 from gui.button import TextButton, RadioButton
 from gui.dice import Dice
-from gui.display import Display
+from gui.gui_common.display import Display
 from common.gameconstants import *
 
 
@@ -78,11 +78,11 @@ class BottomBar(Display):
     def friendly_chat(self):
         pass
 
-    def choose_dice(self):
-        dvals = thorpy.DropDownListLauncher("Choose Dice", titles=[i for i in range(2, 5)])
-        dvals.surface = self.game.surface
-        dvals.blit()
-        return dvals.get_value()
+    # def choose_dice(self):
+    #     dvals = thorpy.DropDownListLauncher("Choose Dice", titles=[i for i in range(2, 5)])
+    #     dvals.surface = self.game.surface
+    #     dvals.blit()
+    #     return dvals.get_value()
 
     def all_chat(self):
         pass

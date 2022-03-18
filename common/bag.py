@@ -19,6 +19,7 @@ class Bag:
         self.bag = []
         self.wildcard_bag = []
         self.tile_id = 0
+        self.total_letters = 0
         self.initialize_bag(game_tiles)
 
     def add_to_bag(self, tile: Tile, quantity):
@@ -41,6 +42,7 @@ class Bag:
             self.add_to_bag(Tile(self.tile_id, index, game_tiles), row['NO'])
 
         shuffle(self.bag)
+        self.total_letters = len(self.bag) + len(self.wildcard_bag)
 
     def take_from_bag(self):
         # Removes a tile from the bag and returns it to the user.
@@ -56,6 +58,9 @@ class Bag:
     def get_remaining_tiles(self):
         # Returns the number of tiles left in the bag.
         return len(self.bag)
+
+    def get_remaining_percent(self):
+        return ((self.get_remaining_tiles() + len(self.wildcard_bag)) / self.total_letters) * 100
 
     def take_wild_bag(self):
         return self.wildcard_bag.pop()

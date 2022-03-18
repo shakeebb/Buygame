@@ -1,11 +1,8 @@
-import os
-
 import pygame
 import sys
 
-from common.game import *
 from common.logger import log
-from gui.display import Display
+from gui.gui_common.display import Display
 from gui.main_menu import MainMenu
 from common.gameconstants import *
 
@@ -30,6 +27,7 @@ class SpriteSheet:
                 for y in x:
                     print(y.get_size())
         return all_sprites
+
 
 #
 # class UIBag(Display):
@@ -56,7 +54,13 @@ class SpriteSheet:
 #         self.rect.x = self.x
 #         self.rect.y = self.y
 
-
+# def is_server_alive(sip):
+#     import nmap, socket
+#     scanner = nmap
+#     host = socket.gethostbyname(sip)
+#     scanner.scan(host, '1', '-v')
+#     return scanner[host].state()
+#
 if __name__ == "__main__":
 
     _reset: bool = False
@@ -64,6 +68,7 @@ if __name__ == "__main__":
     user = server = ""
     port = 0
     import re
+
     for i in range(len(sys.argv)):
         if re.match("-ur|--user-reset", sys.argv[i].lower().strip()):
             _reset = True
@@ -87,13 +92,17 @@ if __name__ == "__main__":
                 i += 1 if i < len(sys.argv) - 1 else 0
                 port = int(sys.argv[i])
             else:
-                port = int(sys.argv[i]).split('=')[1]
+                port = int(sys.argv[i].split('=')[1])
 
     Display.init()
     _main_m = MainMenu(False, False)
+    if len(server.strip()) > 0 and os.system("ping -c 1 " + server) == 0:
+        _main_m.server_endpoint = f"{server}:{port}"
+    else:
+        _main_m.discover_game_server()
     _main_m.controls[0].set_text(user if len(user) > 0 else None)
-    _main_m.controls[1].set_text(server if len(server) > 0 else None)
-    _main_m.controls[2].set_text(port if port > 0 else None)
+    # _main_m.controls[1].set_text(server if len(server) > 0 else None)
+    # _main_m.controls[2].set_text(port if port > 0 else None)
     from gui.gameui import GameUI
     gui = GameUI(_main_m)
     gui.main()

@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from enum import Enum, auto
 
+from common.gamesurvey import SURVEY_QSEQ_DELIM, deserialize_survey_grid_result, deserialize_survey_input_result
 from common.logger import log
 from common.player import Player
 from common.gameconstants import GameStage, PlayerState, Txn, NotificationType, GameStatus
@@ -13,9 +14,14 @@ class GameTracker:
     def __init__(self, game_settings, g_id):
         log(f"creating game with settings {game_settings}")
         self.tracker_filename = os.path.join(game_settings['store_path'], f"{g_id:04d}-{os.getpid()}.csv")
+        self.pg_survey_filename = os.path.join(game_settings['store_path'],
+                                               f"{g_id:04d}-postgame-survey-{os.getpid()}.csv")
+
         log(f"tracking game into {self.tracker_filename}")
         # self.track_file = open(self.tracker_filename, 'a', True)
         write_file(self.tracker_filename, GameTrackerEntry.write_to_csv)
+        write_file(self.pg_survey_filename, SurveyTrackerEntry.write_to_csv)
+
         self.tracker_file = open(self.tracker_filename, 'a', True)
         self.gte = GameTrackerEntry()
 
@@ -30,9 +36,66 @@ class GameTracker:
             cb(self.gte)
         self.gte = self.gte.commit(self.tracker_file, g)
 
+    def capture_post_game_survey(self, msg):
+        ste = SurveyTrackerEntry()
+        ste.game_id = self.gte.game_id
+        ste.player_name = self.gte.player_name
+        ste.session_id = self.gte.session_id
+
+        ds1, ds2 = msg.split(SURVEY_QSEQ_DELIM)
+        sg = deserialize_survey_grid_result(ds1)
+        si = deserialize_survey_input_result(ds2)
+
+        _file = open(self.pg_survey_filename, 'a', True)
+
+        log("SB: persisting player post game survey")
+        for _s in [sg, si]:
+            [ste.commit(_file, q, r) for q, r in _s]
+
     def close(self):
         self.tracker_file.close()
         self.tracker_file = None
+
+
+class SurveyTrackerEntry:
+    def __init__(self):
+        self.game_id = ""
+        self.player_name = ""
+        self.session_id = ""
+        self.survey_question = ""
+        self.survey_result = ""
+
+    def get_column_names(self):
+        return self.__dict__.keys()
+
+    def _internal_dup_entry(self):
+        entry = self.__new__(SurveyTrackerEntry)
+        entry.game_id = self.game_id
+        entry.player_name = self.player_name
+        entry.session_id = self.session_id
+        return entry
+
+    @classmethod
+    def write_to_csv(cls, fp):
+        csv.writer(fp, quoting=csv.QUOTE_NONNUMERIC).writerow(
+            SurveyTrackerEntry().get_column_names()
+        )
+
+    def __repr__(self):
+        return ",".join([str(v) for v in self.__dict__.values()])
+
+    def __str__(self):
+        return self.__repr__()
+
+    def commit(self, file, q, r):
+        e = self._internal_dup_entry()
+        e.survey_question = str(q).replace("\"", '')
+        e.survey_result = str(r).replace("\"", '')
+        log(str(e))
+        csv.writer(file, quoting=csv.QUOTE_ALL).writerow(
+            e.__dict__.values()
+        )
+        file.flush()
 
 
 class GameTrackerEntry:
