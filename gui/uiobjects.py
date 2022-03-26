@@ -6,13 +6,13 @@ from gui.snap import Inventory
 
 
 class UITile(pygame.sprite.Sprite):
-    def __init__(self, xpos, ypos, t_id, tile_sprites: list[list[Surface]], letter='C',
+    def __init__(self, xpos, ypos, t_id, tile_sprites, letter='C',
                  box_size: int = 50,
                  score=None):
         self._layer = TILE_LAYER
         super(UITile, self).__init__()
         self.t_id = t_id
-        self.all_tiles = tile_sprites
+        self.all_tiles: list[list[Surface]] = tile_sprites
         # self.original = pygame.image.load(os.path.join("tiles", f"{letter}.png"))
         if WILD_CARD in letter:
             row = 5

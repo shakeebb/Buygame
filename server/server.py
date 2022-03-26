@@ -285,7 +285,7 @@ class Server:
                 game.set_server_message(ClientResp.Racks_Ready.msg)
 
             elif ClientMsgReq.Get == client_req:
-                msgs_notified_upto = int(str(data).removeprefix("notifications_received="))
+                msgs_notified_upto = int(str(data).lstrip("notifications_received="))
                 _q: deque = _cs.player.notify_msg
                 while _q.__len__() > 0:
                     n = _q.__iter__().__next__()
