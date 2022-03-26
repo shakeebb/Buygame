@@ -63,8 +63,7 @@ class SpriteSheet:
 #
 if __name__ == "__main__":
 
-    _reset: bool = False
-    _restore: bool = False
+    _reset = _restore = _ping_check = False
     user = server = ""
     port = 0
     import re
@@ -93,10 +92,12 @@ if __name__ == "__main__":
                 port = int(sys.argv[i])
             else:
                 port = int(sys.argv[i].split('=')[1])
+        elif re.match("-dpck|--do-ping-check", sys.argv[i].lower().strip()):
+            _ping_check = True
 
     Display.init()
     _main_m = MainMenu(False, False)
-    if len(server.strip()) > 0 and os.system("ping -c 1 " + server) == 0:
+    if _ping_check and len(server.strip()) > 0 and os.system("ping -c 1 " + server) == 0:
         _main_m.server_endpoint = f"{server}:{port}"
     else:
         _main_m.discover_game_server()
