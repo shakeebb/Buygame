@@ -1,5 +1,5 @@
 from common import *
-from gui.main_menu import main
+from gui.base import main
 
 if __name__ == '__main__':
     main()

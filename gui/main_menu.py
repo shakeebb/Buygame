@@ -12,6 +12,7 @@ from common.utils import write_file
 from gui.button import TextButton, MessageBox, InputText, RadioButton
 from gui.gui_common.display import Display
 import yaml
+import sys
 
 
 class MainMenu:
@@ -54,7 +55,7 @@ class MainMenu:
             except yaml.YAMLError as exc:
                 log("settings.yaml error ", exc)
                 pygame.quit()
-                quit()
+                sys.exit()
         # self.widgets: [WidgetBase] = []
         self.login_button: Optional[TextButton] = None
         self.create_screen_layout()
@@ -231,7 +232,7 @@ class MainMenu:
                         (event.type == KEYUP and event.key == K_ESCAPE):
                     run = False
                     pygame.quit()
-                    quit()
+                    sys.exit()
 
                 elif event.type == VIDEORESIZE:
                     # screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)

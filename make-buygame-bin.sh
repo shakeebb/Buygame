@@ -6,7 +6,7 @@ if [[ "`uname`" =~ "MINGW64" ]]; then
   rm pyi-buygame-win.spec
   rm buygame-${version}.exe
 
-  pyi-makespec.exe -w -F --paths venv/Lib/site-packages --paths gui --paths common --add-data "gui\tiles;gui\tiles" buygame.py -n pyi-buygame-win
+  pyi-makespec.exe -w -F --paths venv/Lib/site-packages --paths gui --path gui/login --path gui/survey --path gui/gui_common --paths common --add-data "gui\tiles;gui\tiles" buygame.py -n pyi-buygame-win
 
   pyinstaller --clean ./pyi-buygame-win.spec
 
@@ -17,7 +17,7 @@ elif [[ "`uname`" =~ "Darwin" ]]; then
   rm buygame-${version}-mac
   rm -r dist/pyi-buygame-mac.app
 
- pyi-makespec -w -F --paths venv/Lib/site-packages --paths gui --paths common --add-data "gui/tiles:gui/tiles" buygame.py -n pyi-buygame-mac
+ pyi-makespec -w -F --paths venv/Lib/site-packages --paths gui --path gui/login --path gui/survey --path gui/gui_common --paths common --add-data "gui/tiles:gui/tiles" buygame.py -n pyi-buygame-mac
 
   pyinstaller --clean ./pyi-buygame-mac.spec
 
