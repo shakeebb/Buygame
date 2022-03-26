@@ -17,11 +17,11 @@ elif [[ "`uname`" =~ "Darwin" ]]; then
   rm buygame-${version}-mac
   rm -r dist/pyi-buygame-mac.app
 
- pyi-makespec -w -F --paths venv/Lib/site-packages --paths gui --path gui/login --path gui/survey --path gui/gui_common --paths common --add-data "gui/tiles:gui/tiles" buygame.py -n pyi-buygame-mac
+  pyi-makespec -w -F --paths venv/Lib/site-packages --paths gui --path gui/login --path gui/survey --path gui/gui_common --paths common --add-data "gui/tiles:gui/tiles" buygame.py -n pyi-buygame-mac
 
   pyinstaller --clean ./pyi-buygame-mac.spec
 
-  mv dist/pyi-buygame-mac buygame-${version}-mac
+  mv dist/pyi-buygame-mac.app buygame-${version}-mac.app
 fi
 
 echo "Buygame binary buygame-${version}.exe successfully created"
