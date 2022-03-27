@@ -4,10 +4,11 @@ import os
 import pygame
 from pygame.event import Event
 from pygame.font import Font
-from pygame.locals import *
 
 from common import gameconstants
 from common.gameconstants import *
+import ctypes
+import platform
 
 
 def get_tile_sz(_w, _h, sz):
@@ -113,6 +114,8 @@ class Display(pygame.sprite.Sprite):
     @classmethod
     def init(cls):
         os.environ['SDL_VIDEO_CENTERED'] = '1'  # You have to call this before pygame.init()
+        if platform.system().lower() == 'windows':
+            ctypes.windll.user32.SetProcessDPIAware()
         pygame.init()
         pygame.font.init()
         if cls.__i is None:
@@ -216,3 +219,14 @@ class Display(pygame.sprite.Sprite):
     @classmethod
     def num_vert_cells(cls):
         return cls.__i.num_v_cells
+
+    @classmethod
+    def check_blink_onoff(cls, blink, blink_fps):
+        if not blink:
+            return False, blink_fps
+        draw = True
+        if FPS < blink_fps <= 1.4 * FPS:
+            draw = False
+            return draw, blink_fps + -1.3 * FPS if blink_fps >= 1.3 * FPS else 1
+        else:
+            return draw, blink_fps + 1

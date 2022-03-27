@@ -394,7 +394,7 @@ class Server:
             g = None
             for _g in self.games:
                 if _g.game_status.value < GameStatus.ABANDONED.value and \
-                        _g.game_id == game_id and _g.begin_time == begin_time:
+                        _g.game_id == game_id:  # and _g.begin_time == begin_time:
                     g = _g
                     break
 

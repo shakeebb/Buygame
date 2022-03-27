@@ -221,6 +221,8 @@ class MainMenu:
                     if self.login_button is not None and \
                             self.login_button.click(ss_mx, ss_my):
                         self.login_button.mouse_up()
+                        if self.input_validation_failed():
+                            continue
                         self.login()
                         continue
 
@@ -246,15 +248,9 @@ class MainMenu:
                             self.messagebox = None
                             continue
 
-                        c = self.controls[self.cur_input_field]
-                        if len(c.text.strip()) == 0:
-                            msg = " " + c.p_text + " cannot be empty"
-                            self.messagebox = MessageBox(self.surface.get_width(), self.surface.get_height(),
-                                                         20, 5,
-                                                         msg,
-                                                         "ok", blink=True)
-                            self.messagebox.show()
+                        if self.input_validation_failed():
                             continue
+
                         self.move_next_control(event)
                     else:
                         if self.cur_input_field == 0 and \
@@ -342,6 +338,18 @@ class MainMenu:
         elif self.server_endpoint is not None:
             _, port = self.server_endpoint.split(':')
             return port
+
+    def input_validation_failed(self):
+        c = self.controls[self.cur_input_field]
+        if len(c.text.strip()) == 0:
+            msg = " " + c.p_text + " cannot be empty"
+            self.messagebox = MessageBox(self.surface.get_width(), self.surface.get_height(),
+                                         20, 5,
+                                         msg,
+                                         "ok", blink=True)
+            self.messagebox.show()
+            return True
+        return False
 
 # def main():
 #     _reset: bool = False

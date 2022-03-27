@@ -139,6 +139,8 @@ class Network:
             game: Game = _g
             time.sleep(0.001)
             new_session_id = receive_message(self.client, block=True)
+            if new_session_id is None:
+                raise Exception(f"Could not connect to the server {self.server}")
             if len(new_session_id) > 0:
                 self.session_id = new_session_id
                 self.is_connected = True
