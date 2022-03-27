@@ -11,6 +11,7 @@ if [[ "`uname`" =~ "MINGW64" ]]; then
   pyinstaller --clean ./pyi-buygame-win.spec
 
   mv dist/pyi-buygame-win.exe buygame-${version}.exe
+  echo "Buygame binary buygame-${version}.exe successfully created"
 
 elif [[ "`uname`" =~ "Darwin" ]]; then
   [[ -f pyi-buygame-mac.spec ]] && rm pyi-buygame-win.spec 
@@ -21,8 +22,9 @@ elif [[ "`uname`" =~ "Darwin" ]]; then
 
   pyinstaller --clean ./pyi-buygame-mac.spec
 
-  mv dist/pyi-buygame-mac.app buygame-${version}-mac.app
+  #mv dist/pyi-buygame-mac.app buygame-${version}-mac.app
+  mv dist/pyi-buygame-mac.app/Contents/MacOS/pyi-buygame-mac buygame-${version}-mac.app
+  echo "Buygame binary buygame-${version}-mac.app successfully created"
 fi
 
-echo "Buygame binary buygame-${version}.exe successfully created"
 
