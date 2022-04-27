@@ -98,10 +98,19 @@ def main():
 
     Display.init()
     _main_m = MainMenu(False, False)
+    if _main_m.server_endpoint is not None:
+        server_ep = _main_m.server_endpoint
+        log(f"Server from the client settings file {server_ep}")
+        server = server_ep.split(':')[0] if len(server.strip()) <= 0 else server
+
     if _ping_check and len(server.strip()) > 0 and os.system("ping -c 1 " + server) == 0:
         _main_m.server_endpoint = f"{server}:{port}"
     else:
-        _main_m.discover_game_server()
+        try:
+            _main_m.discover_game_server(_ping_check)
+        except Exception as exp:
+            log("ALERT! Discovery of Server Failed ", exp)
+
     _main_m.controls[0].set_text(user if len(user) > 0 else None)
     # _main_m.controls[1].set_text(server if len(server) > 0 else None)
     # _main_m.controls[2].set_text(port if port > 0 else None)

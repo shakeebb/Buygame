@@ -105,7 +105,7 @@ class GameTrackerEntry:
         self.game_stage = GameStage.INIT
         self.game_status = GameStatus.START
         self.game_last_activity_time = ""
-        self.timestamp = ""
+        # self.timestamp = ""
         self.session_id = ""
         self.player_name = ""
         self.player_ip_address = ""
@@ -129,6 +129,7 @@ class GameTrackerEntry:
 
     def _internal_dup_entry(self, g):
         entry = self.__new__(GameTrackerEntry)
+        entry.__init__()
         entry.update_game(g)
         # entry.game_id = self.game_id
         # entry.game_state = self.game_state
@@ -169,7 +170,7 @@ class GameTrackerEntry:
         if len(buy_rack) > 0:
             self.buy_rack = buy_rack
         from common.game import get_current_timestamp
-        self.timestamp = get_current_timestamp()
+        # self.timestamp = get_current_timestamp()
 
     @classmethod
     def write_to_csv(cls, fp):

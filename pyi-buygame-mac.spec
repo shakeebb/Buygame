@@ -41,4 +41,17 @@ exe = EXE(pyz,
 app = BUNDLE(exe,
              name='pyi-buygame-mac.app',
              icon=None,
-             bundle_identifier=None)
+             bundle_identifier=None,
+             info_plist={
+                         'NSPrincipalClass': 'NSApplication',
+                         'NSAppleScriptEnabled': False,
+                         'CFBundleDocumentTypes': [
+                             {
+                                 'CFBundleTypeName': 'My File Format',
+                                 'CFBundleTypeIconFile': 'MyFileIcon.icns',
+                                 'LSItemContentTypes': ['com.example.myformat'],
+                                 'LSHandlerRank': 'Owner'
+                                 }
+                             ]
+                         },
+	    )
