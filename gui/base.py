@@ -98,14 +98,14 @@ def main():
 
     Display.init()
     _main_m = MainMenu(False, False)
-    if _main_m.server_endpoint is not None:
+    if _main_m.server_endpoint is not None and len(server.strip()) <= 0:
         server_ep = _main_m.server_endpoint
         log(f"Server from the client settings file {server_ep}")
-        server = server_ep.split(':')[0] if len(server.strip()) <= 0 else server
+        server = server_ep.split(':')[0]
 
     if _ping_check and len(server.strip()) > 0 and os.system("ping -c 1 " + server) == 0:
         _main_m.server_endpoint = f"{server}:{port}"
-    else:
+    elif len(server.strip()) <= 0:
         try:
             _main_m.discover_game_server(_ping_check)
         except Exception as exp:

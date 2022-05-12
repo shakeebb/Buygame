@@ -14,6 +14,9 @@ from gui.gui_common.display import Display
 import yaml
 import sys
 
+from gui.login.informed_consent import InformedConsent
+from gui.survey.survey import Survey
+
 
 class MainMenu:
     BG = (255, 255, 255)
@@ -58,13 +61,19 @@ class MainMenu:
                 sys.exit()
         # self.widgets: [WidgetBase] = []
         self.login_button: Optional[TextButton] = None
+        self.new_user_reg: Optional[TextButton] = None
         self.create_screen_layout()
         self.messagebox = None
         if self.game_settings.__contains__('target_server_defaults'):
             svr_defs = self.game_settings['target_server_defaults']
-            self.server_endpoint = f"{svr_defs['ip']:{svr_defs['port']}}"
+            if len(svr_defs['ip'].strip()) > 0 and len(svr_defs['port'].strip()) > 0:
+                self.server_endpoint = f"{svr_defs['ip']}:{svr_defs['port']}"
+            else:
+                self.server_endpoint = None
         else:
             self.server_endpoint = None
+
+        self.informed_consent_done = False
 
     def on_user_choice(self, o: RadioButton.Option):
         if len(self.controls) > 1:
@@ -110,6 +119,10 @@ class MainMenu:
                                        (self.scr_h // 2) // INIT_TILE_SIZE,
                                        *button_features, "Login",
                                        visual_effects=True)
+        self.new_user_reg = TextButton((self.scr_w // 2.3) // INIT_TILE_SIZE,
+                                       (self.scr_h // 2) // INIT_TILE_SIZE,
+                                       *button_features, "New User",
+                                       visual_effects=True)
 
     def login(self):
         self.wc_state = WelcomeState.INPUT_COMPLETE
@@ -124,6 +137,9 @@ class MainMenu:
             _c.draw(self.surface)
         if self.login_button is not None:
             self.login_button.draw(self.surface)
+
+        if self.new_user_reg is not None:
+            self.new_user_reg.draw(self.surface)
 
         if self.user_choices is not None:
             self.user_choices.draw(self.surface)
@@ -205,9 +221,18 @@ class MainMenu:
                         continue
 
                     ss_mx, ss_my = map(lambda _c: _c[0] - _c[1], zip(mouse, self.surface.get_offset()))
-                    if self.login_button is not None and \
-                            self.login_button.click(ss_mx, ss_my):
-                        self.login_button.mouse_down()
+
+                    def button_mouse_down(button):
+                        if button is not None and \
+                                button.click(ss_mx, ss_my):
+                            button.mouse_down()
+                            return True
+                        return False
+
+                    if button_mouse_down(self.login_button):
+                        continue
+
+                    if button_mouse_down(self.new_user_reg):
                         continue
 
                 elif event.type == pygame.MOUSEBUTTONUP:
@@ -228,6 +253,12 @@ class MainMenu:
                         if self.input_validation_failed():
                             continue
                         self.login()
+                        continue
+
+                    if self.new_user_reg is not None and \
+                            self.new_user_reg.click(ss_mx, ss_my):
+                        self.new_user_reg.mouse_up()
+                        self.register_new_user()
                         continue
 
                     if self.user_choices is not None:
@@ -363,6 +394,17 @@ class MainMenu:
             self.messagebox.show()
             return True
         return False
+
+    def register_new_user(self):
+        ic = InformedConsent()
+        ic.main()
+        self.informed_consent_done = True
+        # gameconstants.DISPLAY_TILE_GRID = True
+        # self.post_game_survey = Survey(self.submit_post_game_survey)
+        # s = self.post_game_survey
+        # s.add_post_game_survey_grid()
+        # s.add_post_game_survey_inputs()
+        # pass
 
 # def main():
 #     _reset: bool = False

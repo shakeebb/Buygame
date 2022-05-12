@@ -4,9 +4,9 @@ import pygame
 
 from common.gameconstants import *
 from common.logger import logger
-from gui.common.display import Display
-from gui.common.fontmixin import FontMixin
-from gui.common.subsurface import SubSurface
+from gui.gui_common.display import Display
+from gui.gui_common.fontmixin import FontMixin
+from gui.gui_common.subsurface import SubSurface
 
 
 class Document(FontMixin, Display):
@@ -118,3 +118,5 @@ if __name__ == '__main__':
 
     sa = StudyAnnouncement()
     sa.main()
+
+# end

@@ -8,7 +8,7 @@ from pygame.constants import KEYUP, K_ESCAPE, VIDEORESIZE
 from common.gameconstants import NL_DELIM, INIT_TILE_SIZE, TILE_ADJ_MULTIPLIER, FPS, Colors, LINE_CONT
 from common.gamesurvey import PGGQs, GameSurveyQs, SurveyGridQHeaders, QHeader, PGIQs, SURVEY_QSEQ_DELIM, \
     SURVEY_Qs_DELIM, SURVEY_Qitxt_DELIM, serialize_survey_grid_result, deserialize_survey_input_result, \
-    serialize_survey_input_result, deserialize_survey_grid_result
+    serialize_survey_input_result, deserialize_survey_grid_result, PreGQs
 from common.logger import logger, log
 from gui.button import RadioButton, TextButton
 from gui.gui_common.display import Display
@@ -666,6 +666,18 @@ class Survey(SubSurface):
         sit.disable()
 
         self.s_questions_seq.append(sit)
+
+    def add_pre_game_survey_inputs(self):
+        sit = SurveyQuestionInputText(self)
+        sit.add_survey_question(PGIQs.Q1, 450)
+        sit.add_survey_question(PGIQs.Q2, 450)
+        sit.end_group()
+        sit.disable()
+
+        self.s_questions_seq.append(sit)
+
+    def add_survey_question(self, ques: SurveyQuestion):
+        self.s_questions_seq.append(ques)
 
     def submit_survey(self):
         g = self.s_questions_seq[0]

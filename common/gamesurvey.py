@@ -163,3 +163,27 @@ def deserialize_survey_input_result(ser_obj: str):
         print(m.groups())
         res.append((PGIQs.parse_msg_string(int(m.group(1))), m.group(2)))
     return res
+
+
+class PreGQs(GameSurveyQs):
+    Q1 = "First and Last Name:"
+    Q2 = "Your age:"
+    Q3 = "Which race/ethnicity best describes you"
+    Q4 = "Native Language"
+    Q5 = "How do you describe yourself?"
+    Q6 = "What is your highest level of education?"
+    Q7 = "What is your employment status?"
+    Q8 = "How many years/months of work experience do you have?"
+    Q9 = "How often do you play word games?"
+    Q10 = "How often do you spend reading in a day?"
+    Q11 = "What motivates you to read?"
+    Q12 = f"Compared to people of approximately your age and life experience,{NL_DELIM}\
+             {LINE_CONT} how creative would you rate yourself for each of the following acts? {NL_DELIM}\
+             {LINE_CONT} For acts that you have not specifically done,{NL_DELIM}\
+             {LINE_CONT} estimate your creative potential based on your performance on similar tasks."
+    Q13 = "Please rate the below sentences:"
+
+    @classmethod
+    def parse_msg_string(cls, enum_id: int):
+        return cls(enum_id)
+
