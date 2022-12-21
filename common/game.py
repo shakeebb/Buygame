@@ -168,7 +168,7 @@ class Game:
         except Exception as e:
             log(f"{self} clear rack failed: ", e)
 
-        self.foreach_player(lambda _p: _p.rack.add_to_rack(dice_value, self.bag))
+        self.foreach_player(lambda _p: _p.rack.add_to_rack(dice_value, self.bag)) # populating based on new dice value 
 
         log(f"{self} handed racks to all")
 
@@ -184,7 +184,7 @@ class Game:
                             lambda _p: _p.money >= _p.rack.get_temp_value(),
                             lambda _p: _p.insufficient_balance())
 
-        self.track(plyr, lambda gte: gte.update_msg(f"{plyr.name} rolled dice to {dice_value}",
+        self.track(plyr, lambda gte: gte.update_msg(f"{plyr.name} rolled dice to {dice_value} and got new letters:{plyr.get_temp_str}",
                                                     dice_rolled=dice_value))
 
         # if no players have the buying power, move to sell.
